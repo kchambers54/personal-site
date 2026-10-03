@@ -442,6 +442,10 @@ img {
   pointer-events: auto;
 }
 
+.lightbox.is-closing {
+  pointer-events: none;
+}
+
 .lightbox__backdrop {
   position: absolute;
   inset: 0;
@@ -456,6 +460,10 @@ img {
 
 .lightbox.is-open .lightbox__backdrop {
   opacity: 1;
+}
+
+.lightbox.is-closing .lightbox__backdrop {
+  opacity: 0;
 }
 
 .lightbox__img {

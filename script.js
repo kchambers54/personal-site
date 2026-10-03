@@ -238,6 +238,11 @@
     };
   }
 
+  function readRect(el) {
+    const r = el.getBoundingClientRect();
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  }
+
   function getExpandedRect(naturalW, naturalH) {
     const padX = window.innerWidth * 0.04;
     const padY = window.innerHeight * 0.03;
@@ -258,11 +263,37 @@
     };
   }
 
-  function applyRect(el, rect, withTransition) {
-    el.style.transition = withTransition
-      ? "top 240ms ease-out, left 240ms ease-out, width 240ms ease-out, height 240ms ease-out"
-      : "none";
+  function pinRect(el, rect) {
+    el.style.transition = "none";
     Object.assign(el.style, rectToStyle(rect));
+    // Force style flush so the next transition starts from this rect
+    void el.offsetWidth;
+  }
+
+  function animateRect(el, rect) {
+    el.style.transition =
+      "top 240ms ease-out, left 240ms ease-out, width 240ms ease-out, height 240ms ease-out";
+    Object.assign(el.style, rectToStyle(rect));
+  }
+
+  function cleanupLightbox() {
+    lightbox.classList.remove("is-open", "is-closing");
+    lightbox.hidden = true;
+    lightbox.setAttribute("aria-hidden", "true");
+    lightboxImg.removeAttribute("src");
+    lightboxImg.alt = "";
+    lightboxImg.style.transition = "none";
+    lightboxImg.style.top = "";
+    lightboxImg.style.left = "";
+    lightboxImg.style.width = "";
+    lightboxImg.style.height = "";
+    document.body.style.overflow = "";
+    if (lightboxSource) {
+      lightboxSource.style.opacity = "";
+      if (typeof lightboxSource.focus === "function") lightboxSource.focus();
+    }
+    lightboxSource = null;
+    lightboxBusy = false;
   }
 
   function openLightbox(img) {
@@ -270,7 +301,8 @@
     lightboxBusy = true;
     lightboxSource = img;
 
-    const from = img.getBoundingClientRect();
+    const fromEl = img.closest(".frame") || img;
+    const from = readRect(fromEl);
     const nw = img.naturalWidth || from.width;
     const nh = img.naturalHeight || from.height;
 
@@ -280,28 +312,28 @@
 
     lightbox.hidden = false;
     lightbox.setAttribute("aria-hidden", "false");
+    lightbox.classList.remove("is-closing");
     document.body.style.overflow = "hidden";
 
-    applyRect(lightboxImg, from, false);
-    void lightboxImg.offsetWidth;
-
+    pinRect(lightboxImg, from);
     lightbox.classList.add("is-open");
 
     const to = getExpandedRect(nw, nh);
     if (reduceMotion) {
-      applyRect(lightboxImg, to, false);
+      pinRect(lightboxImg, to);
       lightboxBusy = false;
       return;
     }
 
     requestAnimationFrame(() => {
-      applyRect(lightboxImg, to, true);
+      animateRect(lightboxImg, to);
       const done = () => {
         lightboxImg.removeEventListener("transitionend", onEnd);
         lightboxBusy = false;
       };
       const onEnd = (e) => {
         if (e.target !== lightboxImg) return;
+        if (e.propertyName !== "width" && e.propertyName !== "height") return;
         done();
       };
       lightboxImg.addEventListener("transitionend", onEnd);
@@ -310,51 +342,49 @@
   }
 
   function closeLightbox() {
+    // Ignore repeat closes while a shrink is already running
     if (!lightbox || lightbox.hidden || !lightboxSource) return;
-    lightboxBusy = true;
+    if (lightbox.classList.contains("is-closing")) return;
 
-    const finish = () => {
-      lightbox.classList.remove("is-open");
-      lightbox.hidden = true;
-      lightbox.setAttribute("aria-hidden", "true");
-      lightboxImg.removeAttribute("src");
-      lightboxImg.alt = "";
-      lightboxImg.style.transition = "none";
-      lightboxImg.style.top = "";
-      lightboxImg.style.left = "";
-      lightboxImg.style.width = "";
-      lightboxImg.style.height = "";
-      document.body.style.overflow = "";
-      if (lightboxSource) {
-        lightboxSource.style.opacity = "";
-        if (typeof lightboxSource.focus === "function") lightboxSource.focus();
-      }
-      lightboxSource = null;
-      lightboxBusy = false;
-    };
-
-    if (reduceMotion || !lightboxSource) {
-      finish();
+    if (reduceMotion) {
+      cleanupLightbox();
       return;
     }
 
-    const back = lightboxSource.getBoundingClientRect();
-    lightbox.classList.remove("is-open"); // fade backdrop while image shrinks
-    applyRect(lightboxImg, back, true);
+    lightboxBusy = true;
+    lightbox.classList.add("is-closing");
 
-    let done = false;
-    const wrapUp = () => {
-      if (done) return;
-      done = true;
-      lightboxImg.removeEventListener("transitionend", onEnd);
-      finish();
-    };
-    const onEnd = (e) => {
-      if (e.target !== lightboxImg) return;
-      wrapUp();
-    };
-    lightboxImg.addEventListener("transitionend", onEnd);
-    setTimeout(wrapUp, 300);
+    // Re-measure the thumb now (scroll may have moved). Prefer the frame box.
+    const fromEl = lightboxSource.closest(".frame") || lightboxSource;
+    const back = readRect(fromEl);
+
+    // Pin the current expanded geometry with transition none, then animate
+    // back on the next frame — same pattern as open. Skipping this flush was
+    // why cleanup could run before any shrink painted (transitionend/timeout
+    // on a no-op or same-turn style change).
+    pinRect(lightboxImg, readRect(lightboxImg));
+
+    // Fade the backdrop, but keep the overlay mounted until shrink finishes
+    lightbox.classList.remove("is-open");
+
+    requestAnimationFrame(() => {
+      animateRect(lightboxImg, back);
+
+      let done = false;
+      const wrapUp = () => {
+        if (done) return;
+        done = true;
+        lightboxImg.removeEventListener("transitionend", onEnd);
+        cleanupLightbox();
+      };
+      const onEnd = (e) => {
+        if (e.target !== lightboxImg) return;
+        if (e.propertyName !== "width" && e.propertyName !== "height") return;
+        wrapUp();
+      };
+      lightboxImg.addEventListener("transitionend", onEnd);
+      setTimeout(wrapUp, 320);
+    });
   }
 
   const tripsRoot = document.getElementById("trips");
