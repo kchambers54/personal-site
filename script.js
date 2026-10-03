@@ -139,7 +139,16 @@
       img.src = `photos/${trip.slug}/${filename}`;
       img.alt = trip.place || "";
       img.loading = "lazy";
+      img.tabIndex = 0;
+      img.setAttribute("role", "button");
+      img.setAttribute("aria-label", `Expand ${trip.place || "photo"}`);
       img.addEventListener("load", () => sizeFrameForImage(frame, img));
+      img.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openLightbox(img);
+        }
+      });
 
       frame.appendChild(img);
       strip.appendChild(frame);
@@ -222,4 +231,77 @@
       cancelAnimationFrame(raf);
     });
   }
+
+  // Photo lightbox: expand on click, close on backdrop or Escape
+  const lightbox = document.getElementById("lightbox");
+  const lightboxImg = document.getElementById("lightbox-img");
+  let lightboxSource = null;
+
+  function openLightbox(img) {
+    if (!lightbox || !lightboxImg || !img || !img.src) return;
+    lightboxSource = img;
+    lightboxImg.src = img.currentSrc || img.src;
+    lightboxImg.alt = img.alt || "";
+    lightbox.hidden = false;
+    lightbox.setAttribute("aria-hidden", "false");
+    // Force layout so the open transition runs
+    void lightbox.offsetWidth;
+    lightbox.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightbox.classList.contains("is-open")) return;
+    lightbox.classList.remove("is-open");
+    document.body.style.overflow = "";
+
+    const finish = () => {
+      lightbox.hidden = true;
+      lightbox.setAttribute("aria-hidden", "true");
+      lightboxImg.removeAttribute("src");
+      lightboxImg.alt = "";
+      if (lightboxSource && typeof lightboxSource.focus === "function") {
+        lightboxSource.focus();
+      }
+      lightboxSource = null;
+    };
+
+    if (reduceMotion) {
+      finish();
+      return;
+    }
+
+    let done = false;
+    const wrapUp = () => {
+      if (done) return;
+      done = true;
+      lightbox.removeEventListener("transitionend", onEnd);
+      finish();
+    };
+    const onEnd = (e) => {
+      if (e.target !== lightbox) return;
+      wrapUp();
+    };
+    lightbox.addEventListener("transitionend", onEnd);
+    setTimeout(wrapUp, 300);
+  }
+
+  const tripsRoot = document.getElementById("trips");
+  if (tripsRoot) {
+    tripsRoot.addEventListener("click", (e) => {
+      const img = e.target.closest(".filmstrip--photos .frame img");
+      if (!img) return;
+      openLightbox(img);
+    });
+  }
+
+  if (lightbox) {
+    lightbox.querySelectorAll("[data-lightbox-close]").forEach((el) => {
+      el.addEventListener("click", closeLightbox);
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeLightbox();
+  });
 })();
