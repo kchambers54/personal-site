@@ -3,34 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
   <title>Keller Chambers</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body {
-      font-family: Georgia, serif;
-      max-width: 40rem;
-      margin: 4rem auto;
-      padding: 0 1.25rem;
-      line-height: 1.5;
-    }
-    h1 { font-weight: normal; margin-bottom: 0.25rem; }
-    p.lede { margin-top: 0; }
-    section { margin-top: 2.5rem; }
-    h2 { font-size: 1.1rem; font-weight: normal; letter-spacing: 0.04em; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500&family=Syne:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>Keller Chambers</h1>
-    <p class="lede">Photos and things I've built.</p>
+  <header class="topbar" id="topbar">
+    <a class="topbar__name" href="#top">Keller Chambers</a>
+    <nav class="topbar__nav" aria-label="Primary">
+      <a href="#photos">Photos</a>
+      <a href="#projects">Projects</a>
+    </nav>
   </header>
-  <section>
-    <h2>Photos</h2>
-    <p>Nothing here yet.</p>
-  </section>
-  <section>
-    <h2>Projects</h2>
-    <p>Nothing here yet.</p>
-  </section>
+
+  <main id="top">
+    <section class="hero" aria-label="Introduction">
+      <div class="hero__lights" aria-hidden="true">
+        <div class="hero__orbit">
+          <span class="hero__blob hero__blob--a"></span>
+          <span class="hero__blob hero__blob--b"></span>
+        </div>
+      </div>
+      <div class="hero__content">
+        <h1 class="hero__name" data-reveal>Keller Chambers</h1>
+        <p class="hero__lede">Photos and things I've built.</p>
+      </div>
+    </section>
+
+    <section class="photos" id="photos">
+      <h2 class="section-label">Photos</h2>
+      <div class="trip-band" data-empty="true">
+        <div class="trip-band__rail">
+          <p class="trip-band__place">No trips yet</p>
+        </div>
+        <div class="trip-band__strip-wrap">
+          <div class="filmstrip filmstrip--empty" data-marquee>
+            <div class="filmstrip__track">
+              <div class="filmstrip__set">
+                <div class="frame" aria-hidden="true"></div>
+                <div class="frame" aria-hidden="true"></div>
+                <div class="frame" aria-hidden="true"></div>
+                <div class="frame" aria-hidden="true"></div>
+                <div class="frame" aria-hidden="true"></div>
+                <div class="frame" aria-hidden="true"></div>
+              </div>
+            </div>
+          </div>
+          <p class="trip-band__caption">Grouped by place. Nothing filed yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="projects" id="projects">
+      <h2 class="section-label">Projects</h2>
+      <p class="projects__line">Nothing here yet.</p>
+    </section>
+  </main>
+
+  <div class="pointer" id="pointer" aria-hidden="true"></div>
+  <script src="script.js"></script>
 </body>
 </html>
