@@ -15,19 +15,34 @@
     window.addEventListener("resize", syncTopbar, { passive: true });
   }
 
-  // 1. Name letter reveal
+  // 1. Name letter reveal (letters for rise; words so wraps break only between words)
   const name = document.querySelector("[data-reveal]");
   if (name) {
     const text = name.textContent;
     name.textContent = "";
     name.setAttribute("aria-label", text);
 
-    [...text].forEach((ch, i) => {
-      const span = document.createElement("span");
-      span.className = ch === " " ? "char char--space" : "char";
-      span.textContent = ch === " " ? "\u00a0" : ch;
-      span.style.animationDelay = reduceMotion ? "0ms" : `${i * 40}ms`;
-      name.appendChild(span);
+    let charIndex = 0;
+    text.split(" ").forEach((word, wordIndex) => {
+      if (wordIndex > 0) {
+        // Regular space: break opportunity between nowrap word groups
+        name.appendChild(document.createTextNode(" "));
+        charIndex += 1;
+      }
+
+      const wordSpan = document.createElement("span");
+      wordSpan.className = "word";
+
+      [...word].forEach((ch) => {
+        const span = document.createElement("span");
+        span.className = "char";
+        span.textContent = ch;
+        span.style.animationDelay = reduceMotion ? "0ms" : `${charIndex * 40}ms`;
+        wordSpan.appendChild(span);
+        charIndex += 1;
+      });
+
+      name.appendChild(wordSpan);
     });
 
     if (reduceMotion) {
