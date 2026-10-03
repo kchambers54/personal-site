@@ -19,6 +19,12 @@
     --lede: rgba(22, 21, 19, 0.7);
     --accent: #b4532a;
   }
+
+  .hero__light--2,
+  .hero__light--5 {
+    background: #d9c49a;
+    opacity: 0.55;
+  }
 }
 
 *,
@@ -112,41 +118,124 @@ img {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  overflow: hidden;
 }
 
-.hero__orbit {
+.hero__light {
   position: absolute;
-  left: 20%;
-  bottom: 18%;
-  width: 20vw;
-  height: 20vw;
-  animation: orbit 14s linear infinite;
-  will-change: transform;
-}
-
-.hero__blob {
-  position: absolute;
-  width: 20vw;
-  height: 20vw;
   border-radius: 50%;
-  background: var(--accent);
-  opacity: 0.18;
-  filter: blur(80px);
+  will-change: transform;
+  animation-duration: 10s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
 }
 
-.hero__blob--a {
-  top: 0;
-  left: 0;
+/* Clustered defaults sit behind the name (lower-left third). */
+.hero__light--1 {
+  width: 9vw;
+  height: 9vw;
+  left: 10%;
+  bottom: 26%;
+  background: #e39a4b;
+  opacity: 0.5;
+  filter: blur(22px);
+  animation-name: light-gather-1;
 }
 
-.hero__blob--b {
-  top: 35%;
-  left: 45%;
+.hero__light--2 {
+  width: 7vw;
+  height: 7vw;
+  left: 18%;
+  bottom: 22%;
+  background: #efe6d4;
+  opacity: 0.45;
+  filter: blur(18px);
+  animation-name: light-gather-2;
 }
 
-@keyframes orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.hero__light--3 {
+  width: 11vw;
+  height: 11vw;
+  left: 22%;
+  bottom: 30%;
+  background: #c47d72;
+  opacity: 0.42;
+  filter: blur(24px);
+  animation-name: light-gather-3;
+}
+
+.hero__light--4 {
+  width: 8vw;
+  height: 8vw;
+  left: 14%;
+  bottom: 34%;
+  background: #e39a4b;
+  opacity: 0.48;
+  filter: blur(20px);
+  animation-name: light-gather-4;
+}
+
+.hero__light--5 {
+  width: 6vw;
+  height: 6vw;
+  left: 28%;
+  bottom: 24%;
+  background: #efe6d4;
+  opacity: 0.4;
+  filter: blur(16px);
+  animation-name: light-gather-5;
+}
+
+.hero__light--6 {
+  width: 10vw;
+  height: 10vw;
+  left: 8%;
+  bottom: 20%;
+  background: #c47d72;
+  opacity: 0.44;
+  filter: blur(22px);
+  animation-name: light-gather-6;
+}
+
+/*
+  10s gather–spread cycle with ease-in-out.
+  Long dwell while clustered (0–22%, 82–100%), ease out to spread,
+  brief hold at the wide pose, ease back together.
+*/
+@keyframes light-gather-1 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(14vw, -10vh); }
+  82%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes light-gather-2 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(22vw, 6vh); }
+  82%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes light-gather-3 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(-6vw, -16vh); }
+  82%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes light-gather-4 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(8vw, -18vh); }
+  82%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes light-gather-5 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(26vw, -4vh); }
+  82%, 100% { transform: translate(0, 0); }
+}
+
+@keyframes light-gather-6 {
+  0%, 22% { transform: translate(0, 0); }
+  50%, 58% { transform: translate(-10vw, 8vh); }
+  82%, 100% { transform: translate(0, 0); }
 }
 
 .hero__content {
@@ -361,7 +450,7 @@ img {
     scroll-behavior: auto;
   }
 
-  .hero__orbit {
+  .hero__light {
     animation: none;
   }
 
