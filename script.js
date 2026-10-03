@@ -287,6 +287,9 @@
     lightboxImg.style.left = "";
     lightboxImg.style.width = "";
     lightboxImg.style.height = "";
+    lightboxImg.style.transform = "";
+    lightboxImg.style.transformOrigin = "";
+    lightboxImg.style.opacity = "";
     document.body.style.overflow = "";
     if (lightboxSource) {
       lightboxSource.style.opacity = "";
@@ -356,12 +359,23 @@
 
     // Keep the photo opaque for the whole shrink; backdrop may fade.
     lightboxImg.style.opacity = "1";
-    // Kill any CSS transition so it cannot cancel/skip the WAAPI animation.
+    // Kill CSS transition so it cannot fight the WAAPI transform animation.
     lightboxImg.style.transition = "none";
+    // Clear any existing transform BEFORE measuring rects.
+    lightboxImg.style.transform = "";
+    lightboxImg.style.transformOrigin = "0 0";
+    void lightboxImg.offsetWidth;
 
+    // Leave inline top/left/width/height pinned at the expanded rect.
+    // Do not animate those properties — animate transform only.
     const from = readRect(lightboxImg);
     const fromEl = lightboxSource.closest(".frame") || lightboxSource;
     const to = readRect(fromEl);
+
+    const dx = to.left - from.left;
+    const dy = to.top - from.top;
+    const sx = from.width ? to.width / from.width : 1;
+    const sy = from.height ? to.height / from.height : 1;
 
     // Fade backdrop without unmounting the overlay or the photo
     lightbox.classList.remove("is-open");
@@ -369,17 +383,11 @@
     const animation = lightboxImg.animate(
       [
         {
-          top: `${from.top}px`,
-          left: `${from.left}px`,
-          width: `${from.width}px`,
-          height: `${from.height}px`,
+          transform: "translate(0px, 0px) scale(1, 1)",
           opacity: 1,
         },
         {
-          top: `${to.top}px`,
-          left: `${to.left}px`,
-          width: `${to.width}px`,
-          height: `${to.height}px`,
+          transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
           opacity: 1,
         },
       ],
