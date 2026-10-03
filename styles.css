@@ -377,7 +377,7 @@ img {
   background: transparent;
 }
 
-/* Filmstrip — real photos (native scroll + parallax hook) */
+/* Filmstrip — real photos (native scroll + parallax when many) */
 .filmstrip--photos {
   display: flex;
   gap: 12px;
@@ -388,18 +388,52 @@ img {
   padding-bottom: 0.25rem;
 }
 
+.filmstrip--photos.filmstrip--single {
+  overflow: visible;
+  scroll-snap-type: none;
+  width: 100%;
+  max-width: 100%;
+}
+
 .filmstrip--photos .frame {
   border: none;
   overflow: hidden;
   scroll-snap-align: start;
+  height: 220px;
+}
+
+/* Portrait default 4:5; wide frames get aspect-ratio from JS once loaded. */
+.filmstrip--photos .frame--portrait {
+  width: calc(220px * 4 / 5);
+  aspect-ratio: 4 / 5;
+}
+
+/*
+  Wide / panorama: fit the column. Prefer ~220px tall when the column
+  is wide enough (width = min(100%, 220px * ar)); on a phone the 100%
+  cap wins and height drops so the full image stays visible.
+*/
+.filmstrip--photos .frame--wide {
+  width: min(100%, calc(220px * var(--frame-ar, 1)));
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+  /* aspect-ratio set inline from naturalWidth/naturalHeight */
 }
 
 .filmstrip--photos .frame img {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   transform: translateX(calc(var(--parallax, 0) * 6%));
   will-change: transform;
+}
+
+.filmstrip--photos .frame--wide img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 @keyframes marquee {
