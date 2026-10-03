@@ -121,121 +121,127 @@ img {
   overflow: hidden;
 }
 
+/* Galaxy spin: steady slow rotation of the whole cluster. */
+.hero__swirl {
+  position: absolute;
+  left: 20%;
+  bottom: 28%;
+  width: 0;
+  height: 0;
+  animation: galaxy-spin 48s linear infinite;
+  will-change: transform;
+}
+
+@keyframes galaxy-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .hero__light {
   position: absolute;
+  left: 0;
+  top: 0;
   border-radius: 50%;
   will-change: transform;
-  animation-duration: 10s;
+  animation-duration: 8s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
 
-/* Clustered defaults sit behind the name (lower-left third). */
+/*
+  Continuous radial sine (ease-in-out 0→50→100, no flat holds).
+  Each light has its own angle/radius and a negative delay for phase.
+  translate(-50%, -50%) keeps the disc centered on its orbit point.
+*/
 .hero__light--1 {
   width: 9vw;
   height: 9vw;
-  left: 10%;
-  bottom: 26%;
   background: #e39a4b;
   opacity: 0.5;
   filter: blur(22px);
-  animation-name: light-gather-1;
+  animation-name: light-sine-1;
+  animation-delay: 0s;
 }
 
 .hero__light--2 {
   width: 7vw;
   height: 7vw;
-  left: 18%;
-  bottom: 22%;
   background: #efe6d4;
   opacity: 0.45;
   filter: blur(18px);
-  animation-name: light-gather-2;
+  animation-name: light-sine-2;
+  animation-delay: -1.33s;
 }
 
 .hero__light--3 {
   width: 11vw;
   height: 11vw;
-  left: 22%;
-  bottom: 30%;
   background: #c47d72;
   opacity: 0.42;
   filter: blur(24px);
-  animation-name: light-gather-3;
+  animation-name: light-sine-3;
+  animation-delay: -2.67s;
 }
 
 .hero__light--4 {
   width: 8vw;
   height: 8vw;
-  left: 14%;
-  bottom: 34%;
   background: #e39a4b;
   opacity: 0.48;
   filter: blur(20px);
-  animation-name: light-gather-4;
+  animation-name: light-sine-4;
+  animation-delay: -4s;
 }
 
 .hero__light--5 {
   width: 6vw;
   height: 6vw;
-  left: 28%;
-  bottom: 24%;
   background: #efe6d4;
   opacity: 0.4;
   filter: blur(16px);
-  animation-name: light-gather-5;
+  animation-name: light-sine-5;
+  animation-delay: -5.33s;
 }
 
 .hero__light--6 {
   width: 10vw;
   height: 10vw;
-  left: 8%;
-  bottom: 20%;
   background: #c47d72;
   opacity: 0.44;
   filter: blur(22px);
-  animation-name: light-gather-6;
+  animation-name: light-sine-6;
+  animation-delay: -6.67s;
 }
 
-/*
-  10s gather–spread cycle with ease-in-out.
-  Long dwell while clustered (0–22%, 82–100%), ease out to spread,
-  brief hold at the wide pose, ease back together.
-*/
-@keyframes light-gather-1 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(14vw, -10vh); }
-  82%, 100% { transform: translate(0, 0); }
+/* Angles ~0°, 60°, 120°, 180°, 240°, 300°; distinct inner/outer radii. */
+@keyframes light-sine-1 {
+  0%, 100% { transform: translate(-50%, -50%) translate(2.5vw, 0); }
+  50% { transform: translate(-50%, -50%) translate(10vw, 0); }
 }
 
-@keyframes light-gather-2 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(22vw, 6vh); }
-  82%, 100% { transform: translate(0, 0); }
+@keyframes light-sine-2 {
+  0%, 100% { transform: translate(-50%, -50%) translate(1.8vw, 3.1vw); }
+  50% { transform: translate(-50%, -50%) translate(6vw, 10.4vw); }
 }
 
-@keyframes light-gather-3 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(-6vw, -16vh); }
-  82%, 100% { transform: translate(0, 0); }
+@keyframes light-sine-3 {
+  0%, 100% { transform: translate(-50%, -50%) translate(-2vw, 3.5vw); }
+  50% { transform: translate(-50%, -50%) translate(-7vw, 12.1vw); }
 }
 
-@keyframes light-gather-4 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(8vw, -18vh); }
-  82%, 100% { transform: translate(0, 0); }
+@keyframes light-sine-4 {
+  0%, 100% { transform: translate(-50%, -50%) translate(-3.2vw, 0); }
+  50% { transform: translate(-50%, -50%) translate(-11vw, 0); }
 }
 
-@keyframes light-gather-5 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(26vw, -4vh); }
-  82%, 100% { transform: translate(0, 0); }
+@keyframes light-sine-5 {
+  0%, 100% { transform: translate(-50%, -50%) translate(-1.5vw, -2.6vw); }
+  50% { transform: translate(-50%, -50%) translate(-5vw, -8.7vw); }
 }
 
-@keyframes light-gather-6 {
-  0%, 22% { transform: translate(0, 0); }
-  50%, 58% { transform: translate(-10vw, 8vh); }
-  82%, 100% { transform: translate(0, 0); }
+@keyframes light-sine-6 {
+  0%, 100% { transform: translate(-50%, -50%) translate(2.2vw, -3.8vw); }
+  50% { transform: translate(-50%, -50%) translate(8vw, -13.9vw); }
 }
 
 .hero__content {
@@ -450,6 +456,7 @@ img {
     scroll-behavior: auto;
   }
 
+  .hero__swirl,
   .hero__light {
     animation: none;
   }
