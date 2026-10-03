@@ -73,10 +73,24 @@
   // Homepage shows one cover per trip (images[0] only). Other frames live on trip.html.
   // Loop at most the latest 12 trips: the last 12 entries in trips.json order.
   const MAX_LOOP_COVERS = 12;
-  const COVER_HEIGHT = 220;
+  const COVER_HEIGHT = 160;
+  const LOOP_MS = 48000;
 
   function coverSrc(trip) {
     return "photos/" + trip.slug + "/" + trip.images[0];
+  }
+
+  function mod(n, m) {
+    if (!m) return 0;
+    return ((n % m) + m) % m;
+  }
+
+  function timeMs(value) {
+    if (value == null) return 0;
+    if (typeof value === "number") return value;
+    if (typeof value === "object" && typeof value.value === "number") return value.value;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
   }
 
   function makeCoverLink(trip, hidden) {
@@ -93,7 +107,7 @@
 
     const img = document.createElement("img");
     img.src = coverSrc(trip);
-    img.alt = hidden ? "" : (trip.place || "");
+    img.alt = hidden ? "" : (typeof trip.place === "string" ? trip.place : "");
     img.draggable = false;
     img.decoding = "async";
     link.appendChild(img);
@@ -108,6 +122,7 @@
     img.style.width = width + "px";
     img.style.objectFit = "contain";
     link.style.width = width + "px";
+    link.style.height = COVER_HEIGHT + "px";
     return true;
   }
 
@@ -124,6 +139,12 @@
     return link;
   }
 
+  function cssAnim(track) {
+    if (!track || typeof track.getAnimations !== "function") return null;
+    const list = track.getAnimations();
+    return list.find((anim) => anim.animationName === "cover-row-loop") || null;
+  }
+
   function renderCoverRow(trips) {
     const root = document.getElementById("trips");
     if (!root) return;
@@ -132,72 +153,295 @@
       ? trips.slice(trips.length - MAX_LOOP_COVERS)
       : trips.slice();
 
-    const row = document.createElement("div");
-    row.className = "cover-row";
-    row.setAttribute("role", "region");
-    row.setAttribute("aria-label", "Trips");
+    const state = {
+      token: 0,
+      reduced: false,
+      setWidth: 0,
+      steps: [],
+      index: 0,
+      rows: [],
+      seeker: null
+    };
 
-    const track = document.createElement("div");
-    track.className = "cover-row__track";
-    row.appendChild(track);
-    root.replaceChildren(row);
+    const band = document.createElement("div");
+    band.className = "trip-band";
 
-    let token = 0;
+    const rail = document.createElement("div");
+    rail.className = "trip-band__rail";
+    shown.forEach((trip) => {
+      if (typeof trip.place === "string" && trip.place.trim()) {
+        const place = document.createElement("p");
+        place.className = "trip-band__place";
+        place.textContent = trip.place.trim();
+        rail.appendChild(place);
+      }
+      if (typeof trip.date === "string" && trip.date.trim()) {
+        const date = document.createElement("p");
+        date.className = "trip-band__date";
+        date.textContent = trip.date.trim();
+        rail.appendChild(date);
+      }
+    });
+    const allTrips = document.createElement("a");
+    allTrips.className = "trip-band__all";
+    allTrips.href = "trips.html";
+    allTrips.textContent = "All trips";
+    rail.appendChild(allTrips);
+
+    const wrap = document.createElement("div");
+    wrap.className = "trip-band__strip-wrap";
+
+    const stage = document.createElement("div");
+    stage.className = "cover-rows";
+    stage.setAttribute("role", "region");
+    stage.setAttribute("aria-label", "Trips");
+
+    const rowEntries = [0, 1, 2].map(() => {
+      const row = document.createElement("div");
+      row.className = "cover-row";
+      const track = document.createElement("div");
+      track.className = "cover-row__track";
+      row.appendChild(track);
+      stage.appendChild(row);
+      return { row, track };
+    });
+
+    const controls = document.createElement("div");
+    controls.className = "cover-rows__controls";
+
+    const prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "cover-rows__arrow";
+    prev.setAttribute("aria-label", "Previous");
+    prev.textContent = "Previous";
+
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "cover-rows__arrow";
+    next.setAttribute("aria-label", "Next");
+    next.textContent = "Next";
+
+    controls.appendChild(prev);
+    controls.appendChild(next);
+    stage.appendChild(controls);
+    wrap.appendChild(stage);
+    band.appendChild(rail);
+    band.appendChild(wrap);
+    root.replaceChildren(band);
+    state.rows = rowEntries;
+
+    function stopSeeker() {
+      if (state.seeker) {
+        state.seeker.stop();
+        state.seeker = null;
+      }
+    }
+
+    function seekCss(px) {
+      if (!state.setWidth) return;
+      rowEntries.forEach((entry) => {
+        const anim = cssAnim(entry.track);
+        if (!anim) return;
+        const timing = anim.effect && anim.effect.getComputedTiming
+          ? anim.effect.getComputedTiming()
+          : null;
+        const dur = timeMs(timing && timing.duration) || LOOP_MS;
+        const reverse = entry.track.classList.contains("is-reverse");
+        const dt = (px / state.setWidth) * dur * (reverse ? -1 : 1);
+        anim.currentTime = mod(timeMs(anim.currentTime) + dt, dur);
+      });
+    }
+
+    function skip(dir) {
+      if (!state.steps.length || !state.setWidth) return;
+      let step;
+      if (dir > 0) {
+        step = state.steps[state.index % state.steps.length];
+        state.index = (state.index + 1) % state.steps.length;
+      } else {
+        state.index = (state.index - 1 + state.steps.length) % state.steps.length;
+        step = state.steps[state.index];
+      }
+      const px = dir * step;
+      if (state.reduced) {
+        rowEntries.forEach((entry) => {
+          entry.row.scrollLeft = mod(entry.row.scrollLeft + px, state.setWidth);
+        });
+        return;
+      }
+      if (state.seeker) {
+        state.seeker.seek(px);
+        return;
+      }
+      seekCss(px);
+    }
+
+    prev.addEventListener("click", () => skip(-1));
+    next.addEventListener("click", () => skip(1));
+
+    function startFallback(setWidth, phases) {
+      const my = state.token;
+      const dirs = [1, -1, 1];
+      let elapsed = 0;
+      let last = null;
+      let nudge = 0;
+      let stopped = false;
+
+      function frame(ts) {
+        if (stopped || my !== state.token) return;
+        if (last == null) last = ts;
+        const dt = ts - last;
+        last = ts;
+        const hold = stage.matches(":hover") || stage.contains(document.activeElement);
+        if (!hold) elapsed += dt;
+        const speed = setWidth / LOOP_MS;
+        rowEntries.forEach((entry, i) => {
+          const pos = mod(phases[i] + dirs[i] * speed * elapsed + nudge, setWidth);
+          entry.track.style.transform = "translate3d(" + (-pos) + "px,0,0)";
+        });
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+      state.seeker = {
+        stop() { stopped = true; },
+        seek(px) { nudge += px; }
+      };
+    }
+
+    async function whenAnims() {
+      for (let i = 0; i < 12; i += 1) {
+        const anims = rowEntries.map((entry) => cssAnim(entry.track));
+        if (anims.every(Boolean)) return anims;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return null;
+    }
+
+    function prime(anims, setWidth, stride, half) {
+      anims.forEach((anim, i) => {
+        const timing = anim.effect && anim.effect.getComputedTiming
+          ? anim.effect.getComputedTiming()
+          : null;
+        const dur = timeMs(timing && timing.duration) || LOOP_MS;
+        let frac = 0;
+        if (i === 1) frac = 1 - (stride / setWidth);
+        if (i === 2) frac = half / setWidth;
+        anim.currentTime = mod(frac, 1) * dur;
+      });
+    }
+
+    let resizeTimer = 0;
 
     async function layout() {
-      const my = ++token;
-      const reduced = motionReduced();
-      track.classList.remove("is-looping");
-      track.replaceChildren();
+      const my = ++state.token;
+      stopSeeker();
+      state.reduced = motionReduced();
+      state.setWidth = 0;
+      state.steps = [];
+      state.index = 0;
+      state.seeker = null;
+
+      rowEntries.forEach((entry) => {
+        entry.track.classList.remove("is-looping", "is-reverse");
+        entry.track.style.transform = "";
+        entry.track.replaceChildren();
+        entry.row.removeAttribute("aria-hidden");
+        entry.row.scrollLeft = 0;
+      });
 
       const set = document.createElement("div");
       set.className = "cover-row__set";
       set.setAttribute("data-cover-set", "original");
+      rowEntries[0].track.appendChild(set);
 
       for (const trip of shown) {
         const link = makeCoverLink(trip, false);
         set.appendChild(link);
         await prepareCoverLink(link);
-        if (my !== token) return;
+        if (my !== state.token) return;
       }
 
-      track.appendChild(set);
-
-      // Reduced motion: one real cover per trip, scrolled by hand. No clones, no loop.
-      if (reduced || !shown.length) return;
-
+      const viewport = rowEntries[0].row.clientWidth;
       let guard = 0;
-      const viewport = row.clientWidth;
-      while (viewport > 0 && set.offsetWidth <= viewport && guard < 24) {
-        const before = set.offsetWidth;
+      while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
+        const before = set.getBoundingClientRect().width;
         for (const trip of shown) {
           const link = makeCoverLink(trip, true);
           set.appendChild(link);
           await prepareCoverLink(link);
-          if (my !== token) return;
+          if (my !== state.token) return;
         }
-        if (set.offsetWidth <= before) break;
+        if (set.getBoundingClientRect().width <= before + 1) break;
         guard += 1;
       }
 
-      if (my !== token || set.offsetWidth <= 0) return;
+      if (my !== state.token) return;
 
-      // Second identical set so translateX(-50%) is exactly one set width.
-      const clone = set.cloneNode(true);
-      clone.setAttribute("aria-hidden", "true");
-      clone.setAttribute("data-cover-set", "clone");
-      clone.querySelectorAll("a").forEach((link) => {
+      const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
+      const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
+      const cycle = [...set.querySelectorAll("a")].slice(0, shown.length);
+      if (!cycle.length) return;
+      const steps = cycle.map((link) => link.getBoundingClientRect().width + gapPx);
+      const setWidth = set.getBoundingClientRect().width;
+      const half = cycle[0].getBoundingClientRect().width / 2;
+      const stride = steps[0];
+      state.steps = steps;
+      state.setWidth = setWidth;
+
+      const loopClone = set.cloneNode(true);
+      loopClone.setAttribute("aria-hidden", "true");
+      loopClone.setAttribute("data-cover-set", "clone");
+      loopClone.querySelectorAll("a").forEach((link) => {
         link.tabIndex = -1;
         link.setAttribute("aria-hidden", "true");
       });
-      track.appendChild(clone);
-      if (my !== token) return;
-      track.classList.add("is-looping");
+      rowEntries[0].track.appendChild(loopClone);
+
+      [...set.querySelectorAll("a")].slice(shown.length).forEach((link) => {
+        link.tabIndex = -1;
+        link.setAttribute("aria-hidden", "true");
+      });
+
+      for (let i = 1; i < rowEntries.length; i += 1) {
+        rowEntries[i].row.setAttribute("aria-hidden", "true");
+        [...rowEntries[0].track.children].forEach((node) => {
+          const copy = node.cloneNode(true);
+          copy.querySelectorAll("a").forEach((link) => {
+            link.tabIndex = -1;
+            link.setAttribute("aria-hidden", "true");
+          });
+          rowEntries[i].track.appendChild(copy);
+        });
+      }
+
+      if (my !== state.token || setWidth <= 0) return;
+
+      if (state.reduced) {
+        const offsets = [0, stride, half];
+        rowEntries.forEach((entry, i) => {
+          entry.row.scrollLeft = offsets[i] || 0;
+        });
+        return;
+      }
+
+      rowEntries[1].track.classList.add("is-reverse");
+      rowEntries.forEach((entry) => entry.track.classList.add("is-looping"));
+
+      const anims = await whenAnims();
+      if (my !== state.token) return;
+      if (!anims) {
+        rowEntries.forEach((entry) => {
+          entry.track.classList.remove("is-looping", "is-reverse");
+        });
+        startFallback(setWidth, [0, stride, half]);
+        return;
+      }
+      prime(anims, setWidth, stride, half);
     }
 
     layout();
 
-    let resizeTimer = 0;
     window.addEventListener("resize", () => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(layout, 150);

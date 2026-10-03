@@ -382,26 +382,42 @@ img {
   to { transform: translateX(-50%); }
 }
 
-/* Cover row — one cover per trip, ~220px band, aspect kept, no crop.
-   Width follows the photo (220 * natural aspect). Never a fixed crop. */
+/* Cover rows — 160px, natural aspect, no crop.
+   Width is 160 * natural aspect. Three staggered loops. */
+.cover-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
 .cover-row {
-  height: 220px;
+  height: 160px;
   overflow: hidden;
+  min-width: 0;
+  scroll-behavior: auto;
 }
 
 .cover-row__track {
   display: flex;
   width: max-content;
-  height: 220px;
+  height: 160px;
   will-change: transform;
 }
 
 .cover-row__track.is-looping {
-  animation: cover-row-loop 48s linear infinite;
+  animation-name: cover-row-loop;
+  animation-duration: 48s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
 
-.cover-row:hover .cover-row__track,
-.cover-row:focus-within .cover-row__track {
+.cover-row__track.is-looping.is-reverse {
+  animation-direction: reverse;
+}
+
+.cover-rows:hover .cover-row__track.is-looping,
+.cover-rows:focus-within .cover-row__track.is-looping {
   animation-play-state: paused;
 }
 
@@ -409,7 +425,7 @@ img {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 220px;
+  height: 160px;
   padding-right: 12px;
   flex: 0 0 auto;
 }
@@ -417,7 +433,7 @@ img {
 .cover-row__link {
   flex: 0 0 auto;
   display: block;
-  height: 220px;
+  height: 160px;
   line-height: 0;
 }
 
@@ -427,15 +443,55 @@ img {
 }
 
 .cover-row__link img {
-  height: 220px;
+  height: 160px;
   width: auto;
   max-width: none;
   object-fit: contain;
 }
 
+.cover-rows__controls {
+  display: flex;
+  gap: 12px;
+}
+
+.cover-rows__arrow {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.cover-rows__arrow:hover,
+.cover-rows__arrow:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cover-rows__arrow:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
 @keyframes cover-row-loop {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+.trip-band__place + .trip-band__place,
+.trip-band__date + .trip-band__place {
+  margin-top: 1.25rem;
+}
+
+.trip-band__all {
+  display: block;
+  width: fit-content;
+  margin-top: 1.15rem;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* —— Trip page —— */
@@ -478,10 +534,99 @@ img {
   margin-top: 2rem;
 }
 
+.trip-photo {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.trip-photo:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.trip-photo img,
 .trip-grid img {
   width: 100%;
   height: auto;
   object-fit: contain;
+}
+
+/* Overlay fades in place. It does not grow from the thumbnail. */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 14, 12, 0.92);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 240ms ease, visibility 0s linear 240ms;
+}
+
+.viewer.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 240ms ease, visibility 0s linear 0s;
+}
+
+.viewer__photo {
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 2rem);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform: none;
+}
+
+.trips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  margin-top: 2.5rem;
+}
+
+.trips-list__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem 1.25rem;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.trips-list__item img {
+  height: 96px;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+}
+
+.trips-list__place {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.trips-list__date {
+  margin: 0.35rem 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.trips-empty {
+  margin: 2rem 0 0;
+  font-size: 16px;
+  color: var(--muted);
 }
 
 /* —— Projects —— */
@@ -547,6 +692,11 @@ img {
   .cover-row__track {
     animation: none !important;
     transform: none !important;
+  }
+
+  .viewer,
+  .viewer.is-open {
+    transition: none;
   }
 
   .cover-row {
@@ -618,11 +768,4 @@ img {
     gap: 1rem;
   }
 
-  .cover-row,
-  .cover-row__track,
-  .cover-row__set,
-  .cover-row__link,
-  .cover-row__link img {
-    height: 220px;
-  }
 }
