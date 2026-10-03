@@ -479,6 +479,49 @@ img {
     font-size: clamp(40px, 11vw, 168px);
   }
 
+  /* Phone: vw lights were ~24–43px and vanished under blur. Use px. */
+  .hero__light--1 {
+    width: 96px;
+    height: 96px;
+    filter: blur(10px);
+    opacity: 0.78;
+  }
+
+  .hero__light--2 {
+    width: 72px;
+    height: 72px;
+    filter: blur(8px);
+    opacity: 0.7;
+  }
+
+  .hero__light--3 {
+    width: 120px;
+    height: 120px;
+    filter: blur(12px);
+    opacity: 0.68;
+  }
+
+  .hero__light--4 {
+    width: 88px;
+    height: 88px;
+    filter: blur(9px);
+    opacity: 0.8;
+  }
+
+  .hero__light--5 {
+    width: 76px;
+    height: 76px;
+    filter: blur(8px);
+    opacity: 0.65;
+  }
+
+  .hero__light--6 {
+    width: 108px;
+    height: 108px;
+    filter: blur(11px);
+    opacity: 0.72;
+  }
+
   .trip-band {
     grid-template-columns: 1fr;
     gap: 1rem;
