@@ -353,37 +353,39 @@
 
     lightboxBusy = true;
     lightbox.classList.add("is-closing");
+    // Keep the photo opaque; only the backdrop fades via CSS.
+    lightboxImg.style.opacity = "1";
 
-    // Re-measure the thumb now (scroll may have moved). Prefer the frame box.
-    const fromEl = lightboxSource.closest(".frame") || lightboxSource;
-    const back = readRect(fromEl);
-
-    // Pin the current expanded geometry with transition none, then animate
-    // back on the next frame — same pattern as open. Skipping this flush was
-    // why cleanup could run before any shrink painted (transitionend/timeout
-    // on a no-op or same-turn style change).
+    // 1) Pin current expanded rect with transition none + layout flush
     pinRect(lightboxImg, readRect(lightboxImg));
 
-    // Fade the backdrop, but keep the overlay mounted until shrink finishes
+    // Fade backdrop without unmounting the overlay or the photo
     lightbox.classList.remove("is-open");
 
+    // 2) Wait TWO animation frames before destination + transition
     requestAnimationFrame(() => {
-      animateRect(lightboxImg, back);
+      requestAnimationFrame(() => {
+        // 3) Fresh thumbnail rect, then 240ms ease-out on geometry
+        const fromEl = lightboxSource.closest(".frame") || lightboxSource;
+        const back = readRect(fromEl);
+        animateRect(lightboxImg, back);
 
-      let done = false;
-      const wrapUp = () => {
-        if (done) return;
-        done = true;
-        lightboxImg.removeEventListener("transitionend", onEnd);
-        cleanupLightbox();
-      };
-      const onEnd = (e) => {
-        if (e.target !== lightboxImg) return;
-        if (e.propertyName !== "width" && e.propertyName !== "height") return;
-        wrapUp();
-      };
-      lightboxImg.addEventListener("transitionend", onEnd);
-      setTimeout(wrapUp, 320);
+        // 4) Cleanup only after WIDTH transition ends (fallback if event never fires)
+        let done = false;
+        const wrapUp = () => {
+          if (done) return;
+          done = true;
+          lightboxImg.removeEventListener("transitionend", onEnd);
+          cleanupLightbox();
+        };
+        const onEnd = (e) => {
+          if (e.target !== lightboxImg) return;
+          if (e.propertyName !== "width") return;
+          wrapUp();
+        };
+        lightboxImg.addEventListener("transitionend", onEnd);
+        setTimeout(wrapUp, 280);
+      });
     });
   }
 
