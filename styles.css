@@ -382,89 +382,60 @@ img {
   to { transform: translateX(-50%); }
 }
 
-/* Trip carousel — one cover per trip, full frame, no crop */
-.trip-carousel {
-  padding: 0 6vw 0;
+/* Cover row — one cover per trip, ~220px band, aspect kept, no crop.
+   Width follows the photo (220 * natural aspect). Never a fixed crop. */
+.cover-row {
+  height: 220px;
+  overflow: hidden;
 }
 
-.trip-carousel__controls {
+.cover-row__track {
   display: flex;
+  width: max-content;
+  height: 220px;
+  will-change: transform;
+}
+
+.cover-row__track.is-looping {
+  animation: cover-row-loop 48s linear infinite;
+}
+
+.cover-row:hover .cover-row__track,
+.cover-row:focus-within .cover-row__track {
+  animation-play-state: paused;
+}
+
+.cover-row__set {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 1rem;
+  height: 220px;
+  padding-right: 12px;
+  flex: 0 0 auto;
 }
 
-.trip-carousel__arrow {
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--hairline);
-  padding: 0.45rem 0.9rem;
-  cursor: pointer;
-}
-
-.trip-carousel__arrow:hover,
-.trip-carousel__arrow:focus-visible {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.trip-carousel__stage {
-  position: relative;
-}
-
-.trip-carousel__slide {
+.cover-row__link {
+  flex: 0 0 auto;
   display: block;
-  color: inherit;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 240ms ease-out, visibility 240ms ease-out;
+  height: 220px;
+  line-height: 0;
 }
 
-.trip-carousel__slide.is-active {
-  position: relative;
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  z-index: 1;
-}
-
-.trip-carousel__slide.is-leaving {
-  position: absolute;
-  opacity: 0;
-  visibility: hidden;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.trip-carousel__slide:focus-visible {
+.cover-row__link:focus-visible {
   outline: 1px solid var(--accent);
-  outline-offset: 4px;
+  outline-offset: -4px;
 }
 
-.trip-carousel__slide img {
-  width: 100%;
-  height: auto;
+.cover-row__link img {
+  height: 220px;
+  width: auto;
+  max-width: none;
   object-fit: contain;
 }
 
-.trip-carousel__place {
-  margin: 0.85rem 0 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.trip-carousel__date {
-  margin: 0.35rem 0 0;
-  font-size: 14px;
-  color: var(--muted);
+@keyframes cover-row-loop {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 /* —— Trip page —— */
@@ -572,12 +543,15 @@ img {
     animation: none !important;
   }
 
-  .filmstrip__track {
+  .filmstrip__track,
+  .cover-row__track {
     animation: none !important;
+    transform: none !important;
   }
 
-  .trip-carousel__slide {
-    transition: none;
+  .cover-row {
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .pointer {
@@ -642,5 +616,13 @@ img {
   .trip-band {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+
+  .cover-row,
+  .cover-row__track,
+  .cover-row__set,
+  .cover-row__link,
+  .cover-row__link img {
+    height: 220px;
   }
 }
