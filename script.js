@@ -54,32 +54,125 @@
     }
   }
 
-  // 3. Empty filmstrip: duplicate set for seamless marquee
-  document.querySelectorAll("[data-marquee]").forEach((strip) => {
-    const track = strip.querySelector(".filmstrip__track");
-    const set = strip.querySelector(".filmstrip__set");
-    if (!track || !set) return;
-    const clone = set.cloneNode(true);
-    clone.setAttribute("aria-hidden", "true");
-    track.appendChild(clone);
-  });
+  function initEmptyMarquee() {
+    document.querySelectorAll("[data-marquee]").forEach((strip) => {
+      const track = strip.querySelector(".filmstrip__track");
+      const set = strip.querySelector(".filmstrip__set");
+      if (!track || !set) return;
+      if (track.querySelectorAll(".filmstrip__set").length > 1) return;
+      const clone = set.cloneNode(true);
+      clone.setAttribute("aria-hidden", "true");
+      track.appendChild(clone);
+    });
+  }
 
-  // Real photo strips: tiny parallax against scroll (6%)
-  document.querySelectorAll(".filmstrip--photos").forEach((strip) => {
-    const frames = strip.querySelectorAll(".frame img");
-    if (!frames.length || reduceMotion) return;
+  function bindPhotoParallax() {
+    document.querySelectorAll(".filmstrip--photos:not(.filmstrip--single)").forEach((strip) => {
+      const frames = strip.querySelectorAll(".frame img");
+      if (!frames.length || reduceMotion) return;
 
-    const onScroll = () => {
-      const max = strip.scrollWidth - strip.clientWidth;
-      const progress = max > 0 ? strip.scrollLeft / max : 0;
-      frames.forEach((img) => {
-        img.style.setProperty("--parallax", String((progress - 0.5) * -1));
-      });
-    };
+      const onScroll = () => {
+        const max = strip.scrollWidth - strip.clientWidth;
+        const progress = max > 0 ? strip.scrollLeft / max : 0;
+        frames.forEach((img) => {
+          img.style.setProperty("--parallax", String((progress - 0.5) * -1));
+        });
+      };
 
-    strip.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-  });
+      strip.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+    });
+  }
+
+  function sizeFrameForImage(frame, img) {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return;
+    const ratio = w / h;
+    if (ratio >= 1) {
+      frame.classList.add("frame--wide");
+      frame.classList.remove("frame--portrait");
+      frame.style.aspectRatio = `${w} / ${h}`;
+    } else {
+      frame.classList.add("frame--portrait");
+      frame.classList.remove("frame--wide");
+      frame.style.aspectRatio = "";
+    }
+  }
+
+  function buildTripBand(trip) {
+    const band = document.createElement("div");
+    band.className = "trip-band";
+
+    const rail = document.createElement("div");
+    rail.className = "trip-band__rail";
+
+    const place = document.createElement("p");
+    place.className = "trip-band__place";
+    place.textContent = trip.place;
+    rail.appendChild(place);
+
+    if (trip.date) {
+      const date = document.createElement("p");
+      date.className = "trip-band__date";
+      date.textContent = trip.date;
+      rail.appendChild(date);
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "trip-band__strip-wrap";
+
+    const images = Array.isArray(trip.images) ? trip.images : [];
+    const strip = document.createElement("div");
+    strip.className =
+      images.length <= 1
+        ? "filmstrip filmstrip--photos filmstrip--single"
+        : "filmstrip filmstrip--photos";
+
+    images.forEach((filename) => {
+      const frame = document.createElement("div");
+      frame.className = "frame frame--portrait";
+
+      const img = document.createElement("img");
+      img.src = `photos/${trip.slug}/${filename}`;
+      img.alt = trip.place || "";
+      img.loading = "lazy";
+      img.addEventListener("load", () => sizeFrameForImage(frame, img));
+
+      frame.appendChild(img);
+      strip.appendChild(frame);
+    });
+
+    wrap.appendChild(strip);
+    band.appendChild(rail);
+    band.appendChild(wrap);
+    return band;
+  }
+
+  function renderTrips(trips) {
+    const root = document.getElementById("trips");
+    if (!root) return;
+    root.replaceChildren();
+    trips.forEach((trip) => root.appendChild(buildTripBand(trip)));
+    bindPhotoParallax();
+  }
+
+  // Load trips from photos/trips.json (relative URL for /personal-site/ Pages)
+  (async function loadTrips() {
+    try {
+      const res = await fetch("photos/trips.json");
+      if (!res.ok) throw new Error("trips fetch failed");
+      const data = await res.json();
+      const trips = data && Array.isArray(data.trips) ? data.trips : [];
+      if (!trips.length) {
+        initEmptyMarquee();
+        return;
+      }
+      renderTrips(trips);
+    } catch (err) {
+      initEmptyMarquee();
+    }
+  })();
 
   // 4. Pointer follower (lerp), accent over links, hidden on touch
   if (!reduceMotion && finePointer && pointer) {

@@ -1,0 +1,10 @@
+{
+  "trips": [
+    {
+      "slug": "gasworks-park",
+      "place": "Gasworks Park",
+      "date": "2025",
+      "images": ["01.jpg"]
+    }
+  ]
+}
