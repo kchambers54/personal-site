@@ -125,7 +125,7 @@ img {
   position: absolute;
   border-radius: 50%;
   will-change: transform;
-  animation-duration: 18s;
+  animation-duration: 10s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
@@ -198,7 +198,7 @@ img {
 }
 
 /*
-  18s gather–spread cycle with ease-in-out.
+  10s gather–spread cycle with ease-in-out.
   Long dwell while clustered (0–22%, 82–100%), ease out to spread,
   brief hold at the wide pose, ease back together.
 */
