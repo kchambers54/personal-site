@@ -67,7 +67,7 @@
   }
 
   function bindPhotoParallax() {
-    document.querySelectorAll(".filmstrip--photos:not(.filmstrip--single)").forEach((strip) => {
+    document.querySelectorAll(".filmstrip--photos").forEach((strip) => {
       const frames = strip.querySelectorAll(".frame img");
       if (!frames.length || reduceMotion) return;
 
@@ -84,22 +84,16 @@
     });
   }
 
+  const ROW_HEIGHT = 220;
+
   function sizeFrameForImage(frame, img) {
     const w = img.naturalWidth;
     const h = img.naturalHeight;
     if (!w || !h) return;
     const ratio = w / h;
-    if (ratio >= 1) {
-      frame.classList.add("frame--wide");
-      frame.classList.remove("frame--portrait");
-      frame.style.aspectRatio = `${w} / ${h}`;
-      frame.style.setProperty("--frame-ar", String(ratio));
-    } else {
-      frame.classList.add("frame--portrait");
-      frame.classList.remove("frame--wide");
-      frame.style.aspectRatio = "";
-      frame.style.removeProperty("--frame-ar");
-    }
+    frame.style.height = `${ROW_HEIGHT}px`;
+    frame.style.width = `${ROW_HEIGHT * ratio}px`;
+    frame.style.aspectRatio = `${w} / ${h}`;
   }
 
   function buildTripBand(trip) {
@@ -126,14 +120,11 @@
 
     const images = Array.isArray(trip.images) ? trip.images : [];
     const strip = document.createElement("div");
-    strip.className =
-      images.length <= 1
-        ? "filmstrip filmstrip--photos filmstrip--single"
-        : "filmstrip filmstrip--photos";
+    strip.className = "filmstrip filmstrip--photos";
 
     images.forEach((filename) => {
       const frame = document.createElement("div");
-      frame.className = "frame frame--portrait";
+      frame.className = "frame";
 
       const img = document.createElement("img");
       img.src = `photos/${trip.slug}/${filename}`;
@@ -232,57 +223,137 @@
     });
   }
 
-  // Photo lightbox: expand on click, close on backdrop or Escape
+  // Photo lightbox: expand from thumbnail rect → screen, shrink back on close
   const lightbox = document.getElementById("lightbox");
   const lightboxImg = document.getElementById("lightbox-img");
   let lightboxSource = null;
+  let lightboxBusy = false;
+
+  function rectToStyle(rect) {
+    return {
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    };
+  }
+
+  function getExpandedRect(naturalW, naturalH) {
+    const padX = window.innerWidth * 0.04;
+    const padY = window.innerHeight * 0.03;
+    const maxW = Math.max(1, window.innerWidth - padX * 2);
+    const maxH = Math.max(1, window.innerHeight - padY * 2);
+    const ratio = naturalW / naturalH || 1;
+    let width = maxW;
+    let height = width / ratio;
+    if (height > maxH) {
+      height = maxH;
+      width = height * ratio;
+    }
+    return {
+      top: (window.innerHeight - height) / 2,
+      left: (window.innerWidth - width) / 2,
+      width,
+      height,
+    };
+  }
+
+  function applyRect(el, rect, withTransition) {
+    el.style.transition = withTransition
+      ? "top 240ms ease-out, left 240ms ease-out, width 240ms ease-out, height 240ms ease-out"
+      : "none";
+    Object.assign(el.style, rectToStyle(rect));
+  }
 
   function openLightbox(img) {
-    if (!lightbox || !lightboxImg || !img || !img.src) return;
+    if (!lightbox || !lightboxImg || !img || !img.src || lightboxBusy) return;
+    lightboxBusy = true;
     lightboxSource = img;
+
+    const from = img.getBoundingClientRect();
+    const nw = img.naturalWidth || from.width;
+    const nh = img.naturalHeight || from.height;
+
     lightboxImg.src = img.currentSrc || img.src;
     lightboxImg.alt = img.alt || "";
+    img.style.opacity = "0";
+
     lightbox.hidden = false;
     lightbox.setAttribute("aria-hidden", "false");
-    // Force layout so the open transition runs
-    void lightbox.offsetWidth;
-    lightbox.classList.add("is-open");
     document.body.style.overflow = "hidden";
+
+    applyRect(lightboxImg, from, false);
+    void lightboxImg.offsetWidth;
+
+    lightbox.classList.add("is-open");
+
+    const to = getExpandedRect(nw, nh);
+    if (reduceMotion) {
+      applyRect(lightboxImg, to, false);
+      lightboxBusy = false;
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      applyRect(lightboxImg, to, true);
+      const done = () => {
+        lightboxImg.removeEventListener("transitionend", onEnd);
+        lightboxBusy = false;
+      };
+      const onEnd = (e) => {
+        if (e.target !== lightboxImg) return;
+        done();
+      };
+      lightboxImg.addEventListener("transitionend", onEnd);
+      setTimeout(done, 300);
+    });
   }
 
   function closeLightbox() {
-    if (!lightbox || !lightbox.classList.contains("is-open")) return;
-    lightbox.classList.remove("is-open");
-    document.body.style.overflow = "";
+    if (!lightbox || lightbox.hidden || !lightboxSource) return;
+    lightboxBusy = true;
 
     const finish = () => {
+      lightbox.classList.remove("is-open");
       lightbox.hidden = true;
       lightbox.setAttribute("aria-hidden", "true");
       lightboxImg.removeAttribute("src");
       lightboxImg.alt = "";
-      if (lightboxSource && typeof lightboxSource.focus === "function") {
-        lightboxSource.focus();
+      lightboxImg.style.transition = "none";
+      lightboxImg.style.top = "";
+      lightboxImg.style.left = "";
+      lightboxImg.style.width = "";
+      lightboxImg.style.height = "";
+      document.body.style.overflow = "";
+      if (lightboxSource) {
+        lightboxSource.style.opacity = "";
+        if (typeof lightboxSource.focus === "function") lightboxSource.focus();
       }
       lightboxSource = null;
+      lightboxBusy = false;
     };
 
-    if (reduceMotion) {
+    if (reduceMotion || !lightboxSource) {
       finish();
       return;
     }
+
+    const back = lightboxSource.getBoundingClientRect();
+    lightbox.classList.remove("is-open"); // fade backdrop while image shrinks
+    applyRect(lightboxImg, back, true);
 
     let done = false;
     const wrapUp = () => {
       if (done) return;
       done = true;
-      lightbox.removeEventListener("transitionend", onEnd);
+      lightboxImg.removeEventListener("transitionend", onEnd);
       finish();
     };
     const onEnd = (e) => {
-      if (e.target !== lightbox) return;
+      if (e.target !== lightboxImg) return;
       wrapUp();
     };
-    lightbox.addEventListener("transitionend", onEnd);
+    lightboxImg.addEventListener("transitionend", onEnd);
     setTimeout(wrapUp, 300);
   }
 
