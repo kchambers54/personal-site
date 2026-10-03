@@ -68,8 +68,6 @@
 
   // 4. Pointer follower (lerp), accent over links, hidden on touch
   if (!reduceMotion && finePointer && pointer) {
-    document.body.classList.add("has-pointer");
-
     let targetX = -100;
     let targetY = -100;
     let currentX = -100;
