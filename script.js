@@ -353,39 +353,47 @@
 
     lightboxBusy = true;
     lightbox.classList.add("is-closing");
-    // Keep the photo opaque; only the backdrop fades via CSS.
-    lightboxImg.style.opacity = "1";
 
-    // 1) Pin current expanded rect with transition none + layout flush
-    pinRect(lightboxImg, readRect(lightboxImg));
+    // Keep the photo opaque for the whole shrink; backdrop may fade.
+    lightboxImg.style.opacity = "1";
+    // Kill any CSS transition so it cannot cancel/skip the WAAPI animation.
+    lightboxImg.style.transition = "none";
+
+    const from = readRect(lightboxImg);
+    const fromEl = lightboxSource.closest(".frame") || lightboxSource;
+    const to = readRect(fromEl);
 
     // Fade backdrop without unmounting the overlay or the photo
     lightbox.classList.remove("is-open");
 
-    // 2) Wait TWO animation frames before destination + transition
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        // 3) Fresh thumbnail rect, then 240ms ease-out on geometry
-        const fromEl = lightboxSource.closest(".frame") || lightboxSource;
-        const back = readRect(fromEl);
-        animateRect(lightboxImg, back);
+    const animation = lightboxImg.animate(
+      [
+        {
+          top: `${from.top}px`,
+          left: `${from.left}px`,
+          width: `${from.width}px`,
+          height: `${from.height}px`,
+          opacity: 1,
+        },
+        {
+          top: `${to.top}px`,
+          left: `${to.left}px`,
+          width: `${to.width}px`,
+          height: `${to.height}px`,
+          opacity: 1,
+        },
+      ],
+      {
+        duration: 240,
+        easing: "ease-out",
+        fill: "forwards",
+      }
+    );
 
-        // 4) Cleanup only after WIDTH transition ends (fallback if event never fires)
-        let done = false;
-        const wrapUp = () => {
-          if (done) return;
-          done = true;
-          lightboxImg.removeEventListener("transitionend", onEnd);
-          cleanupLightbox();
-        };
-        const onEnd = (e) => {
-          if (e.target !== lightboxImg) return;
-          if (e.propertyName !== "width") return;
-          wrapUp();
-        };
-        lightboxImg.addEventListener("transitionend", onEnd);
-        setTimeout(wrapUp, 280);
-      });
+    animation.finished.then(() => {
+      cleanupLightbox();
+    }).catch(() => {
+      cleanupLightbox();
     });
   }
 
