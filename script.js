@@ -85,14 +85,6 @@
     return ((n % m) + m) % m;
   }
 
-  function timeMs(value) {
-    if (value == null) return 0;
-    if (typeof value === "number") return value;
-    if (typeof value === "object" && typeof value.value === "number") return value.value;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  }
-
   function makeCoverLink(trip, hidden) {
     const link = document.createElement("a");
     link.className = "cover-row__link";
@@ -139,12 +131,6 @@
     return link;
   }
 
-  function cssAnim(track) {
-    if (!track || typeof track.getAnimations !== "function") return null;
-    const list = track.getAnimations();
-    return list.find((anim) => anim.animationName === "cover-row-loop") || null;
-  }
-
   function renderCoverRow(trips) {
     const root = document.getElementById("trips");
     if (!root) return;
@@ -155,41 +141,17 @@
 
     const state = {
       token: 0,
-      reduced: false,
+      reduced: motionReduced(),
       setWidth: 0,
+      stripWidth: 0,
       steps: [],
       index: 0,
-      rows: [],
-      seeker: null
+      phases: [0, 0, 0],
+      dirs: [1, -1, 1],
+      travel: 0,
+      nudge: 0,
+      ready: false
     };
-
-    const band = document.createElement("div");
-    band.className = "trip-band";
-
-    const rail = document.createElement("div");
-    rail.className = "trip-band__rail";
-    shown.forEach((trip) => {
-      if (typeof trip.place === "string" && trip.place.trim()) {
-        const place = document.createElement("p");
-        place.className = "trip-band__place";
-        place.textContent = trip.place.trim();
-        rail.appendChild(place);
-      }
-      if (typeof trip.date === "string" && trip.date.trim()) {
-        const date = document.createElement("p");
-        date.className = "trip-band__date";
-        date.textContent = trip.date.trim();
-        rail.appendChild(date);
-      }
-    });
-    const allTrips = document.createElement("a");
-    allTrips.className = "trip-band__all";
-    allTrips.href = "trips.html";
-    allTrips.textContent = "All trips";
-    rail.appendChild(allTrips);
-
-    const wrap = document.createElement("div");
-    wrap.className = "trip-band__strip-wrap";
 
     const stage = document.createElement("div");
     stage.className = "cover-rows";
@@ -221,36 +183,46 @@
     next.setAttribute("aria-label", "Next");
     next.textContent = "Next";
 
+    const allTrips = document.createElement("a");
+    allTrips.className = "cover-rows__all";
+    allTrips.href = "trips.html";
+    allTrips.textContent = "All trips";
+
     controls.appendChild(prev);
     controls.appendChild(next);
+    controls.appendChild(allTrips);
     stage.appendChild(controls);
-    wrap.appendChild(stage);
-    band.appendChild(rail);
-    band.appendChild(wrap);
-    root.replaceChildren(band);
-    state.rows = rowEntries;
+    root.replaceChildren(stage);
 
-    function stopSeeker() {
-      if (state.seeker) {
-        state.seeker.stop();
-        state.seeker = null;
-      }
+    function held() {
+      return stage.matches(":hover") || stage.contains(document.activeElement);
     }
 
-    function seekCss(px) {
-      if (!state.setWidth) return;
-      rowEntries.forEach((entry) => {
-        const anim = cssAnim(entry.track);
-        if (!anim) return;
-        const timing = anim.effect && anim.effect.getComputedTiming
-          ? anim.effect.getComputedTiming()
-          : null;
-        const dur = timeMs(timing && timing.duration) || LOOP_MS;
-        const reverse = entry.track.classList.contains("is-reverse");
-        const dt = (px / state.setWidth) * dur * (reverse ? -1 : 1);
-        anim.currentTime = mod(timeMs(anim.currentTime) + dt, dur);
+    function visualPos(i) {
+      const w = state.setWidth;
+      if (!w) return 0;
+      return mod(state.phases[i] + state.dirs[i] * state.travel + state.nudge, w);
+    }
+
+    function apply() {
+      if (state.reduced || !state.setWidth) return;
+      rowEntries.forEach((entry, i) => {
+        entry.track.style.transform = "translate3d(" + (-visualPos(i)) + "px,0,0)";
       });
     }
+
+    let lastTick = performance.now();
+    function frame(ts) {
+      const now = typeof ts === "number" ? ts : performance.now();
+      const dt = now - lastTick;
+      lastTick = now;
+      if (dt > 0 && !state.reduced && state.ready && state.setWidth > 0 && !held()) {
+        state.travel += dt * (state.setWidth / LOOP_MS);
+      }
+      apply();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
 
     function skip(dir) {
       if (!state.steps.length || !state.setWidth) return;
@@ -263,71 +235,23 @@
         step = state.steps[state.index];
       }
       const px = dir * step;
+      state.nudge = mod(state.nudge + px, state.setWidth);
       if (state.reduced) {
         rowEntries.forEach((entry) => {
           entry.row.scrollLeft = mod(entry.row.scrollLeft + px, state.setWidth);
         });
         return;
       }
-      if (state.seeker) {
-        state.seeker.seek(px);
-        return;
-      }
-      seekCss(px);
+      apply();
     }
 
     prev.addEventListener("click", () => skip(-1));
     next.addEventListener("click", () => skip(1));
 
-    function startFallback(setWidth, phases) {
-      const my = state.token;
-      const dirs = [1, -1, 1];
-      let elapsed = 0;
-      let last = null;
-      let nudge = 0;
-      let stopped = false;
-
-      function frame(ts) {
-        if (stopped || my !== state.token) return;
-        if (last == null) last = ts;
-        const dt = ts - last;
-        last = ts;
-        const hold = stage.matches(":hover") || stage.contains(document.activeElement);
-        if (!hold) elapsed += dt;
-        const speed = setWidth / LOOP_MS;
-        rowEntries.forEach((entry, i) => {
-          const pos = mod(phases[i] + dirs[i] * speed * elapsed + nudge, setWidth);
-          entry.track.style.transform = "translate3d(" + (-pos) + "px,0,0)";
-        });
-        requestAnimationFrame(frame);
-      }
-
-      requestAnimationFrame(frame);
-      state.seeker = {
-        stop() { stopped = true; },
-        seek(px) { nudge += px; }
-      };
-    }
-
-    async function whenAnims() {
-      for (let i = 0; i < 12; i += 1) {
-        const anims = rowEntries.map((entry) => cssAnim(entry.track));
-        if (anims.every(Boolean)) return anims;
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-      }
-      return null;
-    }
-
-    function prime(anims, setWidth, stride, half) {
-      anims.forEach((anim, i) => {
-        const timing = anim.effect && anim.effect.getComputedTiming
-          ? anim.effect.getComputedTiming()
-          : null;
-        const dur = timeMs(timing && timing.duration) || LOOP_MS;
-        let frac = 0;
-        if (i === 1) frac = 1 - (stride / setWidth);
-        if (i === 2) frac = half / setWidth;
-        anim.currentTime = mod(frac, 1) * dur;
+    function hideLinks(node) {
+      node.querySelectorAll("a").forEach((link) => {
+        link.tabIndex = -1;
+        link.setAttribute("aria-hidden", "true");
       });
     }
 
@@ -335,116 +259,114 @@
 
     async function layout() {
       const my = ++state.token;
-      stopSeeker();
-      state.reduced = motionReduced();
-      state.setWidth = 0;
-      state.steps = [];
-      state.index = 0;
-      state.seeker = null;
+      const wasReduced = state.reduced;
+      const wasReady = state.ready;
+      const carried = !wasReady
+        ? null
+        : (wasReduced
+          ? rowEntries.map((entry) => entry.row.scrollLeft)
+          : [0, 1, 2].map((i) => visualPos(i)));
 
-      rowEntries.forEach((entry) => {
-        entry.track.classList.remove("is-looping", "is-reverse");
-        entry.track.style.transform = "";
-        entry.track.replaceChildren();
-        entry.row.removeAttribute("aria-hidden");
-        entry.row.scrollLeft = 0;
-      });
-
+      const viewport = rowEntries[0].row.clientWidth;
+      const measurer = document.createElement("div");
+      measurer.className = "cover-row__measure";
       const set = document.createElement("div");
       set.className = "cover-row__set";
       set.setAttribute("data-cover-set", "original");
-      rowEntries[0].track.appendChild(set);
+      measurer.appendChild(set);
+      stage.appendChild(measurer);
 
-      for (const trip of shown) {
-        const link = makeCoverLink(trip, false);
-        set.appendChild(link);
-        await prepareCoverLink(link);
-        if (my !== state.token) return;
-      }
-
-      const viewport = rowEntries[0].row.clientWidth;
-      let guard = 0;
-      while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
-        const before = set.getBoundingClientRect().width;
+      try {
         for (const trip of shown) {
-          const link = makeCoverLink(trip, true);
+          const link = makeCoverLink(trip, false);
           set.appendChild(link);
           await prepareCoverLink(link);
           if (my !== state.token) return;
         }
-        if (set.getBoundingClientRect().width <= before + 1) break;
-        guard += 1;
-      }
 
-      if (my !== state.token) return;
+        let guard = 0;
+        while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
+          const before = set.getBoundingClientRect().width;
+          for (const trip of shown) {
+            const link = makeCoverLink(trip, true);
+            set.appendChild(link);
+            await prepareCoverLink(link);
+            if (my !== state.token) return;
+          }
+          if (set.getBoundingClientRect().width <= before + 1) break;
+          guard += 1;
+        }
 
-      const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
-      const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
-      const cycle = [...set.querySelectorAll("a")].slice(0, shown.length);
-      if (!cycle.length) return;
-      const steps = cycle.map((link) => link.getBoundingClientRect().width + gapPx);
-      const setWidth = set.getBoundingClientRect().width;
-      const half = cycle[0].getBoundingClientRect().width / 2;
-      const stride = steps[0];
-      state.steps = steps;
-      state.setWidth = setWidth;
+        if (my !== state.token) return;
 
-      const loopClone = set.cloneNode(true);
-      loopClone.setAttribute("aria-hidden", "true");
-      loopClone.setAttribute("data-cover-set", "clone");
-      loopClone.querySelectorAll("a").forEach((link) => {
-        link.tabIndex = -1;
-        link.setAttribute("aria-hidden", "true");
-      });
-      rowEntries[0].track.appendChild(loopClone);
+        const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
+        const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
+        const cycle = [...set.querySelectorAll("a")].slice(0, shown.length);
+        if (!cycle.length) return;
 
-      [...set.querySelectorAll("a")].slice(shown.length).forEach((link) => {
-        link.tabIndex = -1;
-        link.setAttribute("aria-hidden", "true");
-      });
+        const steps = cycle.map((link) => link.getBoundingClientRect().width + gapPx);
+        const setWidth = set.getBoundingClientRect().width;
+        const half = cycle[0].getBoundingClientRect().width / 2;
+        const stride = steps[0];
+        if (setWidth <= 0) return;
 
-      for (let i = 1; i < rowEntries.length; i += 1) {
-        rowEntries[i].row.setAttribute("aria-hidden", "true");
-        [...rowEntries[0].track.children].forEach((node) => {
-          const copy = node.cloneNode(true);
-          copy.querySelectorAll("a").forEach((link) => {
-            link.tabIndex = -1;
-            link.setAttribute("aria-hidden", "true");
+        [...set.querySelectorAll("a")].slice(shown.length).forEach((link) => {
+          link.tabIndex = -1;
+          link.setAttribute("aria-hidden", "true");
+        });
+
+        const loopClone = set.cloneNode(true);
+        loopClone.setAttribute("aria-hidden", "true");
+        loopClone.setAttribute("data-cover-set", "clone");
+        hideLinks(loopClone);
+
+        if (my !== state.token) return;
+
+        rowEntries[0].row.removeAttribute("aria-hidden");
+        rowEntries[0].track.replaceChildren(set, loopClone);
+
+        for (let i = 1; i < rowEntries.length; i += 1) {
+          const copySet = set.cloneNode(true);
+          const copyLoop = loopClone.cloneNode(true);
+          hideLinks(copySet);
+          hideLinks(copyLoop);
+          copySet.setAttribute("aria-hidden", "true");
+          rowEntries[i].row.setAttribute("aria-hidden", "true");
+          rowEntries[i].track.replaceChildren(copySet, copyLoop);
+        }
+
+        state.steps = steps;
+        state.setWidth = setWidth;
+        state.phases = [0, stride, half];
+        state.reduced = motionReduced();
+        state.stripWidth = rowEntries[0].row.clientWidth || viewport;
+        state.ready = true;
+
+        if (state.reduced) {
+          rowEntries.forEach((entry) => {
+            entry.track.style.transform = "";
           });
-          rowEntries[i].track.appendChild(copy);
-        });
+          const base = carried || [0, stride, half];
+          rowEntries.forEach((entry, i) => {
+            entry.row.scrollLeft = mod(base[i] || 0, setWidth);
+          });
+        } else {
+          apply();
+        }
+      } finally {
+        if (measurer.parentNode) measurer.remove();
       }
-
-      if (my !== state.token || setWidth <= 0) return;
-
-      if (state.reduced) {
-        const offsets = [0, stride, half];
-        rowEntries.forEach((entry, i) => {
-          entry.row.scrollLeft = offsets[i] || 0;
-        });
-        return;
-      }
-
-      rowEntries[1].track.classList.add("is-reverse");
-      rowEntries.forEach((entry) => entry.track.classList.add("is-looping"));
-
-      const anims = await whenAnims();
-      if (my !== state.token) return;
-      if (!anims) {
-        rowEntries.forEach((entry) => {
-          entry.track.classList.remove("is-looping", "is-reverse");
-        });
-        startFallback(setWidth, [0, stride, half]);
-        return;
-      }
-      prime(anims, setWidth, stride, half);
     }
 
     layout();
 
     window.addEventListener("resize", () => {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(layout, 150);
+      resizeTimer = window.setTimeout(() => {
+        const width = rowEntries[0].row.clientWidth;
+        if (state.stripWidth && Math.abs(width - state.stripWidth) < 1) return;
+        layout();
+      }, 150);
     });
 
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
