@@ -93,10 +93,12 @@
       frame.classList.add("frame--wide");
       frame.classList.remove("frame--portrait");
       frame.style.aspectRatio = `${w} / ${h}`;
+      frame.style.setProperty("--frame-ar", String(ratio));
     } else {
       frame.classList.add("frame--portrait");
       frame.classList.remove("frame--wide");
       frame.style.aspectRatio = "";
+      frame.style.removeProperty("--frame-ar");
     }
   }
 
