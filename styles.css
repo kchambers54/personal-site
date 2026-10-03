@@ -377,69 +377,140 @@ img {
   background: transparent;
 }
 
-/* Filmstrip — real photos (native scroll + parallax when many) */
-.filmstrip--photos {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 0.25rem;
-}
-
-.filmstrip--photos.filmstrip--single {
-  overflow: visible;
-  scroll-snap-type: none;
-  width: 100%;
-  max-width: 100%;
-}
-
-.filmstrip--photos .frame {
-  border: none;
-  overflow: hidden;
-  scroll-snap-align: start;
-  height: 220px;
-  cursor: pointer;
-}
-
-/* Portrait default 4:5; wide frames get aspect-ratio from JS once loaded. */
-.filmstrip--photos .frame--portrait {
-  width: calc(220px * 4 / 5);
-  aspect-ratio: 4 / 5;
-}
-
-/*
-  Wide / panorama: fit the column. Prefer ~220px tall when the column
-  is wide enough (width = min(100%, 220px * ar)); on a phone the 100%
-  cap wins and height drops so the full image stays visible.
-*/
-.filmstrip--photos .frame--wide {
-  width: min(100%, calc(220px * var(--frame-ar, 1)));
-  max-width: 100%;
-  height: auto;
-  overflow: visible;
-  /* aspect-ratio set inline from naturalWidth/naturalHeight */
-}
-
-.filmstrip--photos .frame img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  transform: translateX(calc(var(--parallax, 0) * 6%));
-  will-change: transform;
-}
-
-.filmstrip--photos .frame--wide img {
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-}
-
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
+}
+
+/* Trip carousel — one cover per trip, full frame, no crop */
+.trip-carousel {
+  padding: 0 6vw 0;
+}
+
+.trip-carousel__controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.trip-carousel__arrow {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.trip-carousel__arrow:hover,
+.trip-carousel__arrow:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.trip-carousel__stage {
+  position: relative;
+}
+
+.trip-carousel__slide {
+  display: block;
+  color: inherit;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 240ms ease-out, visibility 240ms ease-out;
+}
+
+.trip-carousel__slide.is-active {
+  position: relative;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.trip-carousel__slide.is-leaving {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.trip-carousel__slide:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.trip-carousel__slide img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.trip-carousel__place {
+  margin: 0.85rem 0 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.trip-carousel__date {
+  margin: 0.35rem 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* —— Trip page —— */
+.trip-page {
+  padding: 7.5rem 6vw 6rem;
+}
+
+.trip-back {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.trip-place {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(40px, 6vw, 72px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.trip-date,
+.trip-status {
+  margin: 0.75rem 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.trip-missing {
+  margin: 0 0 1rem;
+  font-size: 18px;
+}
+
+.trip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.trip-grid img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 /* —— Projects —— */
@@ -457,55 +528,6 @@ img {
 
 .projects__line:hover {
   color: var(--accent);
-}
-
-/* —— Lightbox —— */
-.lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3vh 4vw;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 240ms ease-out, visibility 240ms ease-out;
-}
-
-.lightbox.is-open {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.lightbox__backdrop {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  background: rgba(14, 14, 12, 0.92);
-  cursor: pointer;
-}
-
-.lightbox__img {
-  position: relative;
-  z-index: 1;
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  transform: scale(0.96);
-  transition: transform 240ms ease-out;
-  pointer-events: none;
-}
-
-.lightbox.is-open .lightbox__img {
-  transform: scale(1);
 }
 
 /* —— Pointer —— */
@@ -554,8 +576,7 @@ img {
     animation: none !important;
   }
 
-  .lightbox,
-  .lightbox__img {
+  .trip-carousel__slide {
     transition: none;
   }
 
