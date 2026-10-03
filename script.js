@@ -71,153 +71,142 @@
   }
 
   // Homepage shows one cover per trip (images[0] only). Other frames live on trip.html.
-  function renderCarousel(trips) {
+  // Loop at most the latest 12 trips: the last 12 entries in trips.json order.
+  const MAX_LOOP_COVERS = 12;
+  const COVER_HEIGHT = 220;
+
+  function coverSrc(trip) {
+    return "photos/" + trip.slug + "/" + trip.images[0];
+  }
+
+  function makeCoverLink(trip, hidden) {
+    const link = document.createElement("a");
+    link.className = "cover-row__link";
+    link.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
+    const place = trip.place || "this trip";
+    if (hidden) {
+      link.tabIndex = -1;
+      link.setAttribute("aria-hidden", "true");
+    } else {
+      link.setAttribute("aria-label", "View photos from " + place);
+    }
+
+    const img = document.createElement("img");
+    img.src = coverSrc(trip);
+    img.alt = hidden ? "" : (trip.place || "");
+    img.draggable = false;
+    img.decoding = "async";
+    link.appendChild(img);
+    return link;
+  }
+
+  function sizeCoverLink(link) {
+    const img = link.querySelector("img");
+    if (!img || !img.naturalWidth || !img.naturalHeight) return false;
+    const width = (COVER_HEIGHT * img.naturalWidth) / img.naturalHeight;
+    img.style.height = COVER_HEIGHT + "px";
+    img.style.width = width + "px";
+    img.style.objectFit = "contain";
+    link.style.width = width + "px";
+    return true;
+  }
+
+  async function prepareCoverLink(link) {
+    const img = link.querySelector("img");
+    if (img && img.decode) {
+      try {
+        await img.decode();
+      } catch (err) {
+        // Broken frame: leave it unsized rather than inventing a crop.
+      }
+    }
+    sizeCoverLink(link);
+    return link;
+  }
+
+  function renderCoverRow(trips) {
     const root = document.getElementById("trips");
     if (!root) return;
 
-    const carousel = document.createElement("div");
-    carousel.className = "trip-carousel";
-    carousel.setAttribute("aria-roledescription", "carousel");
-    carousel.setAttribute("aria-label", "Trips");
+    const shown = trips.length > MAX_LOOP_COVERS
+      ? trips.slice(trips.length - MAX_LOOP_COVERS)
+      : trips.slice();
 
-    const multiple = trips.length > 1;
-    let controls = null;
-    if (multiple) {
-      controls = document.createElement("div");
-      controls.className = "trip-carousel__controls";
+    const row = document.createElement("div");
+    row.className = "cover-row";
+    row.setAttribute("role", "region");
+    row.setAttribute("aria-label", "Trips");
 
-      const prev = document.createElement("button");
-      prev.type = "button";
-      prev.className = "trip-carousel__arrow";
-      prev.setAttribute("aria-label", "Previous trip");
-      prev.textContent = "Previous";
-      prev.addEventListener("click", () => {
-        show(index - 1);
-        arm();
-      });
+    const track = document.createElement("div");
+    track.className = "cover-row__track";
+    row.appendChild(track);
+    root.replaceChildren(row);
 
-      const next = document.createElement("button");
-      next.type = "button";
-      next.className = "trip-carousel__arrow";
-      next.setAttribute("aria-label", "Next trip");
-      next.textContent = "Next";
-      next.addEventListener("click", () => {
-        show(index + 1);
-        arm();
-      });
+    let token = 0;
 
-      controls.appendChild(prev);
-      controls.appendChild(next);
-      carousel.appendChild(controls);
-    }
+    async function layout() {
+      const my = ++token;
+      const reduced = motionReduced();
+      track.classList.remove("is-looping");
+      track.replaceChildren();
 
-    const stage = document.createElement("div");
-    stage.className = "trip-carousel__stage";
+      const set = document.createElement("div");
+      set.className = "cover-row__set";
+      set.setAttribute("data-cover-set", "original");
 
-    const slides = trips.map((trip, i) => {
-      const cover = trip.images[0];
-      const slide = document.createElement("a");
-      slide.className = "trip-carousel__slide";
-      slide.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
-      slide.setAttribute("aria-label", "View photos from " + (trip.place || "this trip"));
-
-      const img = document.createElement("img");
-      img.src = "photos/" + trip.slug + "/" + cover;
-      img.alt = trip.place || "";
-      img.loading = i === 0 ? "eager" : "lazy";
-      slide.appendChild(img);
-
-      const place = document.createElement("p");
-      place.className = "trip-carousel__place";
-      place.textContent = trip.place || "";
-      slide.appendChild(place);
-
-      if (typeof trip.date === "string" && trip.date.trim()) {
-        const date = document.createElement("p");
-        date.className = "trip-carousel__date";
-        date.textContent = trip.date.trim();
-        slide.appendChild(date);
+      for (const trip of shown) {
+        const link = makeCoverLink(trip, false);
+        set.appendChild(link);
+        await prepareCoverLink(link);
+        if (my !== token) return;
       }
 
-      stage.appendChild(slide);
-      return slide;
-    });
+      track.appendChild(set);
 
-    carousel.appendChild(stage);
-    root.replaceChildren(carousel);
+      // Reduced motion: one real cover per trip, scrolled by hand. No clones, no loop.
+      if (reduced || !shown.length) return;
 
-    let index = 0;
-    let timer = 0;
-    let hovering = carousel.matches(":hover");
-    let focused = carousel.contains(document.activeElement);
-
-    function show(nextIndex) {
-      const count = slides.length;
-      if (!count) return;
-      const i = ((nextIndex % count) + count) % count;
-      if (i === index && slides[i].classList.contains("is-active")) return;
-
-      const prev = slides[index];
-      if (prev && prev !== slides[i]) {
-        prev.classList.remove("is-active");
-        prev.setAttribute("aria-hidden", "true");
-        prev.tabIndex = -1;
-        if (!motionReduced()) {
-          prev.classList.add("is-leaving");
-          window.setTimeout(() => prev.classList.remove("is-leaving"), 240);
+      let guard = 0;
+      const viewport = row.clientWidth;
+      while (viewport > 0 && set.offsetWidth <= viewport && guard < 24) {
+        const before = set.offsetWidth;
+        for (const trip of shown) {
+          const link = makeCoverLink(trip, true);
+          set.appendChild(link);
+          await prepareCoverLink(link);
+          if (my !== token) return;
         }
+        if (set.offsetWidth <= before) break;
+        guard += 1;
       }
 
-      const slide = slides[i];
-      slide.classList.remove("is-leaving");
-      slide.classList.add("is-active");
-      slide.setAttribute("aria-hidden", "false");
-      slide.tabIndex = 0;
-      index = i;
+      if (my !== token || set.offsetWidth <= 0) return;
+
+      // Second identical set so translateX(-50%) is exactly one set width.
+      const clone = set.cloneNode(true);
+      clone.setAttribute("aria-hidden", "true");
+      clone.setAttribute("data-cover-set", "clone");
+      clone.querySelectorAll("a").forEach((link) => {
+        link.tabIndex = -1;
+        link.setAttribute("aria-hidden", "true");
+      });
+      track.appendChild(clone);
+      if (my !== token) return;
+      track.classList.add("is-looping");
     }
 
-    function arm() {
-      window.clearInterval(timer);
-      timer = 0;
-      if (!multiple || motionReduced() || hovering || focused) return;
-      timer = window.setInterval(() => show(index + 1), 7000);
-    }
+    layout();
 
-    function setHover(on) {
-      hovering = on;
-      arm();
-    }
-
-    carousel.addEventListener("pointerenter", (e) => {
-      if (e.pointerType === "touch") return;
-      setHover(true);
-    });
-    carousel.addEventListener("pointerleave", (e) => {
-      if (e.pointerType === "touch") return;
-      setHover(false);
-    });
-    carousel.addEventListener("focusin", () => {
-      focused = true;
-      arm();
-    });
-    carousel.addEventListener("focusout", (e) => {
-      if (carousel.contains(e.relatedTarget)) return;
-      focused = false;
-      arm();
+    let resizeTimer = 0;
+    window.addEventListener("resize", () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(layout, 150);
     });
 
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (typeof motion.addEventListener === "function") {
-      motion.addEventListener("change", arm);
+      motion.addEventListener("change", layout);
     }
-
-    slides.forEach((slide, i) => {
-      const on = i === 0;
-      slide.classList.toggle("is-active", on);
-      slide.setAttribute("aria-hidden", on ? "false" : "true");
-      slide.tabIndex = on ? 0 : -1;
-    });
-    arm();
   }
 
   // Load trips from photos/trips.json (relative URL for /personal-site/ Pages)
@@ -234,7 +223,7 @@
         initEmptyMarquee();
         return;
       }
-      renderCarousel(covers);
+      renderCoverRow(covers);
     } catch (err) {
       initEmptyMarquee();
     }
