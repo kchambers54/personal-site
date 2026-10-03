@@ -385,6 +385,7 @@ img {
 /* Cover rows — 160px, natural aspect, no crop.
    Width is 160 * natural aspect. Three staggered loops. */
 .cover-rows {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -405,20 +406,13 @@ img {
   will-change: transform;
 }
 
-.cover-row__track.is-looping {
-  animation-name: cover-row-loop;
-  animation-duration: 48s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-.cover-row__track.is-looping.is-reverse {
-  animation-direction: reverse;
-}
-
-.cover-rows:hover .cover-row__track.is-looping,
-.cover-rows:focus-within .cover-row__track.is-looping {
-  animation-play-state: paused;
+/* Position comes from the JS clock, not a CSS animation (those restart offscreen). */
+.cover-row__measure {
+  position: absolute;
+  width: max-content;
+  height: auto;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .cover-row__set {
@@ -451,7 +445,10 @@ img {
 
 .cover-rows__controls {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+  padding: 4px 6vw 0;
 }
 
 .cover-rows__arrow {
@@ -476,9 +473,9 @@ img {
   outline-offset: 3px;
 }
 
-@keyframes cover-row-loop {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+.cover-rows__all {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .trip-band__place + .trip-band__place,
