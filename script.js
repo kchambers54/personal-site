@@ -66,106 +66,158 @@
     });
   }
 
-  function bindPhotoParallax() {
-    document.querySelectorAll(".filmstrip--photos:not(.filmstrip--single)").forEach((strip) => {
-      const frames = strip.querySelectorAll(".frame img");
-      if (!frames.length || reduceMotion) return;
-
-      const onScroll = () => {
-        const max = strip.scrollWidth - strip.clientWidth;
-        const progress = max > 0 ? strip.scrollLeft / max : 0;
-        frames.forEach((img) => {
-          img.style.setProperty("--parallax", String((progress - 0.5) * -1));
-        });
-      };
-
-      strip.addEventListener("scroll", onScroll, { passive: true });
-      onScroll();
-    });
+  function motionReduced() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
-  function sizeFrameForImage(frame, img) {
-    const w = img.naturalWidth;
-    const h = img.naturalHeight;
-    if (!w || !h) return;
-    const ratio = w / h;
-    if (ratio >= 1) {
-      frame.classList.add("frame--wide");
-      frame.classList.remove("frame--portrait");
-      frame.style.aspectRatio = `${w} / ${h}`;
-      frame.style.setProperty("--frame-ar", String(ratio));
-    } else {
-      frame.classList.add("frame--portrait");
-      frame.classList.remove("frame--wide");
-      frame.style.aspectRatio = "";
-      frame.style.removeProperty("--frame-ar");
-    }
-  }
-
-  function buildTripBand(trip) {
-    const band = document.createElement("div");
-    band.className = "trip-band";
-
-    const rail = document.createElement("div");
-    rail.className = "trip-band__rail";
-
-    const place = document.createElement("p");
-    place.className = "trip-band__place";
-    place.textContent = trip.place;
-    rail.appendChild(place);
-
-    if (trip.date) {
-      const date = document.createElement("p");
-      date.className = "trip-band__date";
-      date.textContent = trip.date;
-      rail.appendChild(date);
-    }
-
-    const wrap = document.createElement("div");
-    wrap.className = "trip-band__strip-wrap";
-
-    const images = Array.isArray(trip.images) ? trip.images : [];
-    const strip = document.createElement("div");
-    strip.className =
-      images.length <= 1
-        ? "filmstrip filmstrip--photos filmstrip--single"
-        : "filmstrip filmstrip--photos";
-
-    images.forEach((filename) => {
-      const frame = document.createElement("div");
-      frame.className = "frame frame--portrait";
-
-      const img = document.createElement("img");
-      img.src = `photos/${trip.slug}/${filename}`;
-      img.alt = trip.place || "";
-      img.loading = "lazy";
-      img.tabIndex = 0;
-      img.setAttribute("role", "button");
-      img.setAttribute("aria-label", `Expand ${trip.place || "photo"}`);
-      img.addEventListener("load", () => sizeFrameForImage(frame, img));
-      img.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openLightbox(img);
-        }
-      });
-
-      frame.appendChild(img);
-      strip.appendChild(frame);
-    });
-
-    wrap.appendChild(strip);
-    band.appendChild(rail);
-    band.appendChild(wrap);
-    return band;
-  }
-
-  function renderTrips(trips) {
+  // Homepage shows one cover per trip (images[0] only). Other frames live on trip.html.
+  function renderCarousel(trips) {
     const root = document.getElementById("trips");
     if (!root) return;
-    root.replaceChildren();
-    trips.forEach((trip) => root.appendChild(buildTripBand(trip)));
-    bindPhotoParallax();
+
+    const carousel = document.createElement("div");
+    carousel.className = "trip-carousel";
+    carousel.setAttribute("aria-roledescription", "carousel");
+    carousel.setAttribute("aria-label", "Trips");
+
+    const multiple = trips.length > 1;
+    let controls = null;
+    if (multiple) {
+      controls = document.createElement("div");
+      controls.className = "trip-carousel__controls";
+
+      const prev = document.createElement("button");
+      prev.type = "button";
+      prev.className = "trip-carousel__arrow";
+      prev.setAttribute("aria-label", "Previous trip");
+      prev.textContent = "Previous";
+      prev.addEventListener("click", () => {
+        show(index - 1);
+        arm();
+      });
+
+      const next = document.createElement("button");
+      next.type = "button";
+      next.className = "trip-carousel__arrow";
+      next.setAttribute("aria-label", "Next trip");
+      next.textContent = "Next";
+      next.addEventListener("click", () => {
+        show(index + 1);
+        arm();
+      });
+
+      controls.appendChild(prev);
+      controls.appendChild(next);
+      carousel.appendChild(controls);
+    }
+
+    const stage = document.createElement("div");
+    stage.className = "trip-carousel__stage";
+
+    const slides = trips.map((trip, i) => {
+      const cover = trip.images[0];
+      const slide = document.createElement("a");
+      slide.className = "trip-carousel__slide";
+      slide.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
+      slide.setAttribute("aria-label", "View photos from " + (trip.place || "this trip"));
+
+      const img = document.createElement("img");
+      img.src = "photos/" + trip.slug + "/" + cover;
+      img.alt = trip.place || "";
+      img.loading = i === 0 ? "eager" : "lazy";
+      slide.appendChild(img);
+
+      const place = document.createElement("p");
+      place.className = "trip-carousel__place";
+      place.textContent = trip.place || "";
+      slide.appendChild(place);
+
+      if (typeof trip.date === "string" && trip.date.trim()) {
+        const date = document.createElement("p");
+        date.className = "trip-carousel__date";
+        date.textContent = trip.date.trim();
+        slide.appendChild(date);
+      }
+
+      stage.appendChild(slide);
+      return slide;
+    });
+
+    carousel.appendChild(stage);
+    root.replaceChildren(carousel);
+
+    let index = 0;
+    let timer = 0;
+    let hovering = carousel.matches(":hover");
+    let focused = carousel.contains(document.activeElement);
+
+    function show(nextIndex) {
+      const count = slides.length;
+      if (!count) return;
+      const i = ((nextIndex % count) + count) % count;
+      if (i === index && slides[i].classList.contains("is-active")) return;
+
+      const prev = slides[index];
+      if (prev && prev !== slides[i]) {
+        prev.classList.remove("is-active");
+        prev.setAttribute("aria-hidden", "true");
+        prev.tabIndex = -1;
+        if (!motionReduced()) {
+          prev.classList.add("is-leaving");
+          window.setTimeout(() => prev.classList.remove("is-leaving"), 240);
+        }
+      }
+
+      const slide = slides[i];
+      slide.classList.remove("is-leaving");
+      slide.classList.add("is-active");
+      slide.setAttribute("aria-hidden", "false");
+      slide.tabIndex = 0;
+      index = i;
+    }
+
+    function arm() {
+      window.clearInterval(timer);
+      timer = 0;
+      if (!multiple || motionReduced() || hovering || focused) return;
+      timer = window.setInterval(() => show(index + 1), 7000);
+    }
+
+    function setHover(on) {
+      hovering = on;
+      arm();
+    }
+
+    carousel.addEventListener("pointerenter", (e) => {
+      if (e.pointerType === "touch") return;
+      setHover(true);
+    });
+    carousel.addEventListener("pointerleave", (e) => {
+      if (e.pointerType === "touch") return;
+      setHover(false);
+    });
+    carousel.addEventListener("focusin", () => {
+      focused = true;
+      arm();
+    });
+    carousel.addEventListener("focusout", (e) => {
+      if (carousel.contains(e.relatedTarget)) return;
+      focused = false;
+      arm();
+    });
+
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (typeof motion.addEventListener === "function") {
+      motion.addEventListener("change", arm);
+    }
+
+    slides.forEach((slide, i) => {
+      const on = i === 0;
+      slide.classList.toggle("is-active", on);
+      slide.setAttribute("aria-hidden", on ? "false" : "true");
+      slide.tabIndex = on ? 0 : -1;
+    });
+    arm();
   }
 
   // Load trips from photos/trips.json (relative URL for /personal-site/ Pages)
@@ -175,11 +227,14 @@
       if (!res.ok) throw new Error("trips fetch failed");
       const data = await res.json();
       const trips = data && Array.isArray(data.trips) ? data.trips : [];
-      if (!trips.length) {
+      const covers = trips.filter(
+        (trip) => trip && trip.slug && Array.isArray(trip.images) && trip.images[0]
+      );
+      if (!covers.length) {
         initEmptyMarquee();
         return;
       }
-      renderTrips(trips);
+      renderCarousel(covers);
     } catch (err) {
       initEmptyMarquee();
     }
@@ -231,77 +286,4 @@
       cancelAnimationFrame(raf);
     });
   }
-
-  // Photo lightbox: expand on click, close on backdrop or Escape
-  const lightbox = document.getElementById("lightbox");
-  const lightboxImg = document.getElementById("lightbox-img");
-  let lightboxSource = null;
-
-  function openLightbox(img) {
-    if (!lightbox || !lightboxImg || !img || !img.src) return;
-    lightboxSource = img;
-    lightboxImg.src = img.currentSrc || img.src;
-    lightboxImg.alt = img.alt || "";
-    lightbox.hidden = false;
-    lightbox.setAttribute("aria-hidden", "false");
-    // Force layout so the open transition runs
-    void lightbox.offsetWidth;
-    lightbox.classList.add("is-open");
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeLightbox() {
-    if (!lightbox || !lightbox.classList.contains("is-open")) return;
-    lightbox.classList.remove("is-open");
-    document.body.style.overflow = "";
-
-    const finish = () => {
-      lightbox.hidden = true;
-      lightbox.setAttribute("aria-hidden", "true");
-      lightboxImg.removeAttribute("src");
-      lightboxImg.alt = "";
-      if (lightboxSource && typeof lightboxSource.focus === "function") {
-        lightboxSource.focus();
-      }
-      lightboxSource = null;
-    };
-
-    if (reduceMotion) {
-      finish();
-      return;
-    }
-
-    let done = false;
-    const wrapUp = () => {
-      if (done) return;
-      done = true;
-      lightbox.removeEventListener("transitionend", onEnd);
-      finish();
-    };
-    const onEnd = (e) => {
-      if (e.target !== lightbox) return;
-      wrapUp();
-    };
-    lightbox.addEventListener("transitionend", onEnd);
-    setTimeout(wrapUp, 300);
-  }
-
-  const tripsRoot = document.getElementById("trips");
-  if (tripsRoot) {
-    tripsRoot.addEventListener("click", (e) => {
-      const img = e.target.closest(".filmstrip--photos .frame img");
-      if (!img) return;
-      openLightbox(img);
-    });
-  }
-
-  if (lightbox) {
-    lightbox.querySelectorAll("[data-lightbox-close]").forEach((el) => {
-      el.addEventListener("click", closeLightbox);
-    });
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeLightbox();
-  });
 })();
