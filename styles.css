@@ -381,6 +381,8 @@ img {
 @media (max-width: 720px) {
   .hero__name {
     white-space: normal;
+    overflow: visible;
+    font-size: clamp(40px, 11vw, 168px);
   }
 
   .trip-band {
