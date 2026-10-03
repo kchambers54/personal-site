@@ -400,6 +400,7 @@ img {
   overflow: hidden;
   scroll-snap-align: start;
   height: 220px;
+  cursor: pointer;
 }
 
 /* Portrait default 4:5; wide frames get aspect-ratio from JS once loaded. */
@@ -458,6 +459,55 @@ img {
   color: var(--accent);
 }
 
+/* —— Lightbox —— */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 4vw;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 240ms ease-out, visibility 240ms ease-out;
+}
+
+.lightbox.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(14, 14, 12, 0.92);
+  cursor: pointer;
+}
+
+.lightbox__img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform: scale(0.96);
+  transition: transform 240ms ease-out;
+  pointer-events: none;
+}
+
+.lightbox.is-open .lightbox__img {
+  transform: scale(1);
+}
+
 /* —— Pointer —— */
 .pointer {
   position: fixed;
@@ -502,6 +552,11 @@ img {
 
   .filmstrip__track {
     animation: none !important;
+  }
+
+  .lightbox,
+  .lightbox__img {
+    transition: none;
   }
 
   .pointer {
