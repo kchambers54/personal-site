@@ -2,6 +2,60 @@
   const root = document.getElementById("trip");
   if (!root) return;
 
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const viewer = document.createElement("div");
+  viewer.className = "viewer";
+  viewer.setAttribute("role", "dialog");
+  viewer.setAttribute("aria-modal", "true");
+  viewer.setAttribute("aria-label", "Photo");
+  viewer.tabIndex = -1;
+
+  const viewerImg = document.createElement("img");
+  viewerImg.className = "viewer__photo";
+  viewerImg.alt = "";
+  viewer.appendChild(viewerImg);
+  document.body.appendChild(viewer);
+
+  let opener = null;
+  let closeTimer = 0;
+
+  function openViewer(src, alt, from) {
+    opener = from || null;
+    window.clearTimeout(closeTimer);
+    viewerImg.src = src;
+    viewerImg.alt = alt || "";
+    viewer.classList.add("is-open");
+    viewer.focus();
+    document.addEventListener("keydown", onKey);
+  }
+
+  function closeViewer() {
+    if (!viewer.classList.contains("is-open")) return;
+    viewer.classList.remove("is-open");
+    document.removeEventListener("keydown", onKey);
+    const finish = () => {
+      if (viewer.classList.contains("is-open")) return;
+      viewerImg.removeAttribute("src");
+      viewerImg.alt = "";
+      if (opener && typeof opener.focus === "function") opener.focus();
+      opener = null;
+    };
+    if (reduceMotion) finish();
+    else closeTimer = window.setTimeout(finish, 240);
+  }
+
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeViewer();
+    }
+  }
+
+  viewer.addEventListener("click", (e) => {
+    if (e.target === viewer) closeViewer();
+  });
+
   function linkHome(label, href) {
     const a = document.createElement("a");
     a.className = "trip-back";
@@ -42,11 +96,18 @@
     grid.className = "trip-grid";
     const images = Array.isArray(trip.images) ? trip.images : [];
     images.forEach((filename, i) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "trip-photo";
       const img = document.createElement("img");
       img.src = "photos/" + trip.slug + "/" + filename;
       img.alt = images.length > 1 ? place + ", photo " + (i + 1) : place;
       img.loading = i === 0 ? "eager" : "lazy";
-      grid.appendChild(img);
+      button.appendChild(img);
+      button.addEventListener("click", () => {
+        openViewer(img.currentSrc || img.src, img.alt, button);
+      });
+      grid.appendChild(button);
     });
     root.appendChild(grid);
   }
