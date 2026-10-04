@@ -144,13 +144,13 @@
       token: 0,
       reduced: motionReduced(),
       setWidth: 0,
-      stripWidth: 0,
+      stripWidths: [0, 0, 0],
       steps: [],
       index: 0,
       phases: [0, 0, 0],
       dirs: [1, -1, 1],
       travel: 0,
-      nudge: 0,
+      nudges: [0, 0, 0],
       ready: false
     };
 
@@ -169,21 +169,12 @@
       return { row, track };
     });
 
-    const controls = document.createElement("div");
-    controls.className = "cover-rows__controls";
-
-    const allCollections = document.createElement("a");
-    allCollections.className = "cover-rows__all";
-    allCollections.href = "collections.html";
-    allCollections.textContent = "All collections";
-    controls.appendChild(allCollections);
-    stage.appendChild(controls);
     root.replaceChildren(stage);
 
     function visualPos(i) {
       const w = state.setWidth;
       if (!w) return 0;
-      return mod(state.phases[i] + state.dirs[i] * state.travel + state.nudge, w);
+      return mod(state.phases[i] + state.dirs[i] * state.travel + state.nudges[i], w);
     }
 
     function apply() {
@@ -204,7 +195,14 @@
       const hidden = document.visibilityState === "hidden";
       // A suspended or hidden gap must not jump the rows forward.
       if (!hidden && dt > 0 && dt < 200 && !state.reduced && state.ready && state.setWidth > 0) {
-        state.travel += dt * (state.setWidth / LOOP_MS);
+        const delta = dt * (state.setWidth / LOOP_MS);
+        state.travel += delta;
+        // The finger owns the dragged row. Cancel that row's auto step so the
+        // others keep moving and this one resumes from the dragged offset.
+        if (drag && drag.dragged) {
+          const i = drag.index;
+          state.nudges[i] = mod(state.nudges[i] - state.dirs[i] * delta, state.setWidth);
+        }
       }
       apply();
     }
@@ -231,52 +229,53 @@
     document.addEventListener("freeze", () => { lastTick = performance.now(); });
     document.addEventListener("resume", resumeClock);
 
-    // Touch drag moves the shared offset. A tap still follows the link.
+    // Touch drag changes only the row under the finger. A tap still follows the link.
     const DRAG_START = 10;
     let drag = null;
     let blockClick = false;
 
-    function nudgeBy(dx) {
+    function nudgeRow(index, dx) {
       if (!state.setWidth) return;
       if (state.reduced) {
-        rowEntries.forEach((entry) => {
-          entry.row.scrollLeft = mod(entry.row.scrollLeft - dx, state.setWidth);
-        });
+        const entry = rowEntries[index];
+        entry.row.scrollLeft = mod(entry.row.scrollLeft - dx, state.setWidth);
         return;
       }
-      state.nudge = mod(state.nudge - dx, state.setWidth);
+      state.nudges[index] = mod(state.nudges[index] - dx, state.setWidth);
       apply();
     }
 
-    stage.addEventListener("pointerdown", (e) => {
-      if (e.pointerType !== "touch" || !e.isPrimary) return;
-      drag = { id: e.pointerId, x: e.clientX, lastX: e.clientX, dragged: false };
-      if (stage.setPointerCapture) {
-        try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    rowEntries.forEach((entry, index) => {
+      entry.row.addEventListener("pointerdown", (e) => {
+        if (e.pointerType !== "touch" || !e.isPrimary) return;
+        drag = { id: e.pointerId, x: e.clientX, lastX: e.clientX, dragged: false, index };
+        if (entry.row.setPointerCapture) {
+          try { entry.row.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        }
+      });
+
+      entry.row.addEventListener("pointermove", (e) => {
+        if (!drag || e.pointerId !== drag.id || drag.index !== index) return;
+        const dx = e.clientX - drag.lastX;
+        drag.lastX = e.clientX;
+        if (!drag.dragged && Math.abs(e.clientX - drag.x) >= DRAG_START) drag.dragged = true;
+        if (!drag.dragged) return;
+        nudgeRow(index, dx);
+        e.preventDefault();
+      }, { passive: false });
+
+      function endDrag(e) {
+        if (!drag || e.pointerId !== drag.id || drag.index !== index) return;
+        const dragged = drag.dragged;
+        drag = null;
+        if (!dragged) return;
+        blockClick = true;
+        window.setTimeout(() => { blockClick = false; }, 500);
       }
+
+      entry.row.addEventListener("pointerup", endDrag);
+      entry.row.addEventListener("pointercancel", endDrag);
     });
-
-    stage.addEventListener("pointermove", (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      const dx = e.clientX - drag.lastX;
-      drag.lastX = e.clientX;
-      if (!drag.dragged && Math.abs(e.clientX - drag.x) >= DRAG_START) drag.dragged = true;
-      if (!drag.dragged) return;
-      nudgeBy(dx);
-      e.preventDefault();
-    }, { passive: false });
-
-    function endDrag(e) {
-      if (!drag || e.pointerId !== drag.id) return;
-      const dragged = drag.dragged;
-      drag = null;
-      if (!dragged) return;
-      blockClick = true;
-      window.setTimeout(() => { blockClick = false; }, 500);
-    }
-
-    stage.addEventListener("pointerup", endDrag);
-    stage.addEventListener("pointercancel", endDrag);
     stage.addEventListener("click", (e) => {
       if (!blockClick) return;
       blockClick = false;
@@ -295,14 +294,6 @@
 
     async function layout() {
       const my = ++state.token;
-      const wasReduced = state.reduced;
-      const wasReady = state.ready;
-      const carried = !wasReady
-        ? null
-        : (wasReduced
-          ? rowEntries.map((entry) => entry.row.scrollLeft)
-          : [0, 1, 2].map((i) => visualPos(i)));
-
       const viewport = rowEntries[0].row.clientWidth;
       const measurer = document.createElement("div");
       measurer.className = "cover-row__measure";
@@ -371,11 +362,24 @@
           rowEntries[i].track.replaceChildren(copySet, copyLoop);
         }
 
+        const carried = !state.ready
+          ? null
+          : (state.reduced
+            ? rowEntries.map((entry) => entry.row.scrollLeft)
+            : [0, 1, 2].map((i) => visualPos(i)));
+
         state.steps = steps;
         state.setWidth = setWidth;
         state.phases = [0, stride, half];
         state.reduced = motionReduced();
-        state.stripWidth = rowEntries[0].row.clientWidth || viewport;
+        state.stripWidths = rowEntries.map((entry) => entry.row.clientWidth || viewport);
+        if (carried && !state.reduced) {
+          state.nudges = carried.map((pos, i) =>
+            mod(pos - state.phases[i] - state.dirs[i] * state.travel, setWidth)
+          );
+        } else if (!carried) {
+          state.nudges = [0, 0, 0];
+        }
         state.ready = true;
 
         if (state.reduced) {
@@ -399,8 +403,9 @@
     window.addEventListener("resize", () => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
-        const width = rowEntries[0].row.clientWidth;
-        if (state.stripWidth && Math.abs(width - state.stripWidth) < 1) return;
+        const widths = rowEntries.map((entry) => entry.row.clientWidth);
+        const unchanged = widths.every((width, i) => Math.abs(width - state.stripWidths[i]) < 1);
+        if (state.ready && unchanged) return;
         layout();
       }, 150);
     });
