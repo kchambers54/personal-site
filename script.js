@@ -72,11 +72,14 @@
 
   // Each homepage row shows every photo from every collection.
   // The full list is shuffled once per row on load. Later resizes keep that order.
-  const COVER_HEIGHT = 160;
   // One full strip used to take LOOP_MS. Pace is now 0.2 times that (80% slower).
   const LOOP_MS = 48000;
   const SPEED_SCALE = 0.2;
-  const PLACEHOLDER_W = 240;
+  const PLACEHOLDER_ASPECT = 1.5;
+  // Page scroll speed (px/ms) adds this many base speeds, signed, up to SCROLL_BOOST_MAX.
+  const SCROLL_BOOST = 6;
+  const SCROLL_BOOST_MAX = 14;
+  const HOVER_SPEED = 0.1;
 
   function mod(n, m) {
     if (!m) return 0;
@@ -90,13 +93,13 @@
   function flattenFrames(trips) {
     const frames = [];
     trips.forEach((trip) => {
-      if (!trip || !trip.slug || !Array.isArray(trip.images)) return;
-      trip.images.forEach((file) => {
-        if (!file) return;
+      trip.images.forEach((image) => {
         frames.push({
           slug: trip.slug,
-          file: file,
-          place: typeof trip.place === "string" ? trip.place : ""
+          file: image.file,
+          width: image.width,
+          aspect: image.aspect,
+          place: trip.place
         });
       });
     });
@@ -148,12 +151,14 @@
     return orders;
   }
 
-  function makeCoverLink(frame, hidden, knownWidths) {
+  function makeCoverLink(frame, hidden, knownAspects, coverH) {
     const link = document.createElement("a");
     link.className = "cover-row__link";
     link.draggable = false;
     link.href = "collection.html?slug=" + encodeURIComponent(frame.slug);
     link.dataset.frame = frameKey(frame);
+    link.dataset.morph = frameKey(frame);
+    if (frame.place) link.dataset.label = frame.place;
     const place = frame.place || "this collection";
     if (hidden) {
       link.tabIndex = -1;
@@ -163,16 +168,21 @@
     }
 
     const img = document.createElement("img");
-    img.dataset.src = "photos/" + frame.slug + "/" + frame.file;
+    img.dataset.src = Photos.src(frame.slug, frame.file);
     img.alt = hidden ? "" : place;
     img.draggable = false;
     img.decoding = "async";
-    const width = knownWidths.get(frameKey(frame)) || PLACEHOLDER_W;
-    img.style.height = COVER_HEIGHT + "px";
+    const width = (knownAspects.get(frameKey(frame)) || PLACEHOLDER_ASPECT) * coverH;
+    const srcset = Photos.srcset(frame.slug, frame);
+    if (srcset) {
+      img.dataset.srcset = srcset;
+      img.dataset.sizes = Math.ceil(width) + "px";
+    }
+    img.style.height = coverH + "px";
     img.style.width = width + "px";
     img.style.objectFit = "contain";
     link.style.width = width + "px";
-    link.style.height = COVER_HEIGHT + "px";
+    link.style.height = coverH + "px";
     link.appendChild(img);
     return link;
   }
@@ -184,7 +194,11 @@
     const frames = flattenFrames(trips);
     if (!frames.length) return;
 
-    const knownWidths = new Map();
+    const knownAspects = new Map();
+    frames.forEach((frame) => {
+      if (frame.aspect) knownAspects.set(frameKey(frame), frame.aspect);
+    });
+    let coverH = 160;
 
     const state = {
       token: 0,
@@ -198,6 +212,9 @@
       orders: distinctOrders(frames),
       // Once per load, within ±5% of the new base. Not re-rolled on resize or drag.
       speedFactors: [0, 1, 2].map(() => 0.95 + Math.random() * 0.1),
+      hoverFactors: [1, 1, 1],
+      hoverTargets: [1, 1, 1],
+      scrollBoost: 0,
       ready: false
     };
 
@@ -217,6 +234,23 @@
     });
 
     root.replaceChildren(stage);
+
+    // Rows sit below the hero, so hold off loading photos until they're close.
+    let stageNear = !("IntersectionObserver" in window);
+    if (!stageNear) {
+      new IntersectionObserver((entries) => {
+        stageNear = entries[entries.length - 1].isIntersecting;
+        if (stageNear) {
+          apply();
+          reveal();
+        }
+      }, { rootMargin: "10% 0px" }).observe(stage);
+    }
+
+    function readCoverHeight() {
+      const value = Number.parseFloat(getComputedStyle(stage).getPropertyValue("--cover-h"));
+      return value > 0 ? value : 160;
+    }
 
     function visualPos(i) {
       const w = state.rowWidths[i];
@@ -244,9 +278,10 @@
       return set.offsetWidth;
     }
 
-    function applyMeasuredWidth(key, width) {
-      if (!key || !(width > 0)) return;
-      knownWidths.set(key, width);
+    function applyMeasuredAspect(key, aspect) {
+      if (!key || !(aspect > 0)) return;
+      knownAspects.set(key, aspect);
+      const width = aspect * coverH;
       rowEntries.forEach((entry, i) => {
         const prevW = state.rowWidths[i];
         const pos = state.ready && prevW ? visualPos(i) : 0;
@@ -259,11 +294,11 @@
           const img = link.querySelector("img");
           if (img) {
             img.style.width = width + "px";
-            img.style.height = COVER_HEIGHT + "px";
+            img.style.height = coverH + "px";
             img.style.objectFit = "contain";
           }
           link.style.width = width + "px";
-          link.style.height = COVER_HEIGHT + "px";
+          link.style.height = coverH + "px";
           if (before.right <= rowRect.left + 0.5) shift += width - before.width;
         });
         const newW = cycleDistance(entry);
@@ -287,45 +322,67 @@
         if (!img.naturalWidth || !img.naturalHeight) return;
         const link = img.closest("a");
         if (!link) return;
-        const width = (COVER_HEIGHT * img.naturalWidth) / img.naturalHeight;
-        applyMeasuredWidth(link.dataset.frame, width);
+        applyMeasuredAspect(link.dataset.frame, img.naturalWidth / img.naturalHeight);
       });
     }
 
     function nearView(link, row) {
       const tile = link.getBoundingClientRect();
       const box = row.getBoundingClientRect();
-      const margin = box.width || window.innerWidth || PLACEHOLDER_W;
+      const margin = box.width || window.innerWidth || coverH * PLACEHOLDER_ASPECT;
       return tile.right >= box.left - margin && tile.left <= box.right + margin;
     }
 
     function reveal() {
+      if (!stageNear) return;
       rowEntries.forEach((entry) => {
         entry.track.querySelectorAll("img").forEach((img) => {
           if (img.getAttribute("src") || !img.dataset.src) return;
           const link = img.closest("a");
           if (!link || !nearView(link, entry.row)) return;
           armImage(img);
+          // Listeners don't survive cloneNode, so attach the fade here rather than at creation.
+          Photos.fadeIn(img);
+          if (img.dataset.srcset) {
+            img.sizes = img.dataset.sizes;
+            img.srcset = img.dataset.srcset;
+            // A missing smaller copy falls back to the original.
+            img.addEventListener("error", () => img.removeAttribute("srcset"), { once: true });
+          }
           img.src = img.dataset.src;
         });
       });
     }
 
     let lastTick = performance.now();
+    let lastScrollY = window.scrollY;
     let rafId = 0;
     let loopGen = 0;
+
+    function ease(current, target, dt, ms) {
+      return current + (target - current) * (1 - Math.exp(-dt / ms));
+    }
 
     function frame(ts) {
       const now = typeof ts === "number" ? ts : performance.now();
       const dt = now - lastTick;
       lastTick = now;
+      const scrollY = window.scrollY;
+      const scrolled = scrollY - lastScrollY;
+      lastScrollY = scrollY;
       const hidden = document.visibilityState === "hidden";
       // A suspended or hidden gap must not jump the rows forward.
       if (!hidden && dt > 0 && dt < 200 && !state.reduced && state.ready) {
+        // Scrolling down pushes the rows along; scrolling up briefly reverses them.
+        const boostTarget = Math.max(-SCROLL_BOOST_MAX,
+          Math.min(SCROLL_BOOST_MAX, (scrolled / dt) * SCROLL_BOOST));
+        state.scrollBoost = ease(state.scrollBoost, boostTarget, dt, 160);
         for (let i = 0; i < rowEntries.length; i += 1) {
           const w = state.rowWidths[i];
           if (!(w > 0)) continue;
-          const delta = dt * (w / LOOP_MS) * SPEED_SCALE * state.speedFactors[i];
+          state.hoverFactors[i] = ease(state.hoverFactors[i], state.hoverTargets[i], dt, 220);
+          const pace = state.hoverFactors[i] + state.scrollBoost;
+          const delta = dt * (w / LOOP_MS) * SPEED_SCALE * state.speedFactors[i] * pace;
           state.travelPx[i] += delta;
           // The finger owns the dragged row. Cancel that row's auto step so the
           // others keep moving and this one resumes from the dragged offset.
@@ -334,12 +391,14 @@
           }
         }
       }
+      if (!stageNear) return;
       apply();
       reveal();
     }
 
     function resumeClock() {
       lastTick = performance.now();
+      lastScrollY = window.scrollY;
       loopGen += 1;
       const gen = loopGen;
       if (rafId) cancelAnimationFrame(rafId);
@@ -378,6 +437,14 @@
     }
 
     rowEntries.forEach((entry, index) => {
+      // Mouse hover eases the row nearly to a stop.
+      entry.row.addEventListener("pointerenter", (e) => {
+        if (e.pointerType === "mouse") state.hoverTargets[index] = HOVER_SPEED;
+      });
+      entry.row.addEventListener("pointerleave", () => {
+        state.hoverTargets[index] = 1;
+      });
+
       entry.row.addEventListener("pointerdown", (e) => {
         if (e.pointerType !== "touch" || !e.isPrimary) return;
         drag = { id: e.pointerId, x: e.clientX, lastX: e.clientX, dragged: false, index };
@@ -428,6 +495,7 @@
     function layout() {
       const my = ++state.token;
       const viewport = rowEntries[0].row.clientWidth;
+      coverH = readCoverHeight();
       const measurer = document.createElement("div");
       measurer.className = "cover-row__measure";
       stage.appendChild(measurer);
@@ -442,7 +510,7 @@
           set.setAttribute("data-cover-set", "original");
           measurer.appendChild(set);
           order.forEach((frame) => {
-            set.appendChild(makeCoverLink(frame, false, knownWidths));
+            set.appendChild(makeCoverLink(frame, false, knownAspects, coverH));
           });
 
           // One cycle is the permutation itself. The clone is the next copy,
@@ -456,7 +524,7 @@
           const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
           const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
           const first = links[0];
-          const firstW = first ? first.getBoundingClientRect().width : PLACEHOLDER_W;
+          const firstW = first ? first.getBoundingClientRect().width : coverH * PLACEHOLDER_ASPECT;
           const setWidth = set.getBoundingClientRect().width;
           if (!(setWidth > 0) || !first) return;
           built.push({
@@ -536,13 +604,8 @@
   // Load collections from photos/collections.json (relative URL for /personal-site/ Pages)
   (async function loadTrips() {
     try {
-      const res = await fetch("photos/collections.json");
-      if (!res.ok) throw new Error("trips fetch failed");
-      const data = await res.json();
-      const trips = data && Array.isArray(data.trips) ? data.trips : [];
-      const covers = trips.filter(
-        (trip) => trip && trip.slug && Array.isArray(trip.images) && trip.images[0]
-      );
+      const trips = await Photos.load();
+      const covers = trips.filter((trip) => trip.images.length);
       if (!covers.length) {
         initEmptyMarquee();
         return;
@@ -588,15 +651,75 @@
       { passive: true }
     );
 
+    const pointerLabel = pointer.querySelector(".pointer__label");
     document.addEventListener("mouseover", (e) => {
       const link = e.target.closest("a");
       pointer.classList.toggle("is-accent", Boolean(link));
+      const label = link && link.dataset.label;
+      if (label && pointerLabel) pointerLabel.textContent = label;
+      pointer.classList.toggle("has-label", Boolean(label && pointerLabel));
     });
 
     document.addEventListener("mouseleave", () => {
       pointer.classList.remove("is-visible");
       visible = false;
       cancelAnimationFrame(raf);
+    });
+  }
+
+  // 5. Hero lights chase the cursor on a loose spring and spread out while moving.
+  const hero = document.querySelector(".hero");
+  const swirl = document.querySelector(".hero__swirl");
+  if (!reduceMotion && finePointer && hero && swirl) {
+    const wide = window.matchMedia("(min-width: 701px)");
+    const STIFFNESS = 0.012;
+    const DAMPING = 0.86;
+    let x = 0;
+    let y = 0;
+    let vx = 0;
+    let vy = 0;
+    let tx = 0;
+    let ty = 0;
+    let spread = 1;
+    let raf = 0;
+    let last = 0;
+
+    const tick = (now) => {
+      const f = last ? Math.min((now - last) / 16.67, 3) : 1;
+      last = now;
+      vx = (vx + (tx - x) * STIFFNESS * f) * Math.pow(DAMPING, f);
+      vy = (vy + (ty - y) * STIFFNESS * f) * Math.pow(DAMPING, f);
+      x += vx * f;
+      y += vy * f;
+      const speed = Math.hypot(vx, vy);
+      spread += (1 + Math.min(speed / 40, 0.7) - spread) * 0.08 * f;
+      swirl.style.translate = x.toFixed(1) + "px " + y.toFixed(1) + "px";
+      swirl.style.scale = spread.toFixed(3);
+      const settled = Math.abs(tx - x) < 0.2 && Math.abs(ty - y) < 0.2 && speed < 0.02 && spread < 1.002;
+      raf = settled ? 0 : requestAnimationFrame(tick);
+    };
+
+    const wake = () => {
+      if (raf) return;
+      last = 0;
+      raf = requestAnimationFrame(tick);
+    };
+
+    // Targets are offsets from the cluster's resting spot; leaving the hero sends it home.
+    window.addEventListener("pointermove", (e) => {
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const box = hero.getBoundingClientRect();
+      // Narrow windows spread the lights across the hero instead of clustering them.
+      const inside = wide.matches && e.clientY >= box.top && e.clientY <= box.bottom;
+      tx = inside ? e.clientX - box.left - swirl.offsetLeft : 0;
+      ty = inside ? e.clientY - box.top - swirl.offsetTop : 0;
+      wake();
+    }, { passive: true });
+
+    document.addEventListener("mouseleave", () => {
+      tx = 0;
+      ty = 0;
+      wake();
     });
   }
 })();

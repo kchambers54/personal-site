@@ -33,11 +33,15 @@
       <div class="hero__content">
         <h1 class="hero__name" data-reveal>Keller Chambers</h1>
       </div>
+      <a class="hero__cue" href="#photos">
+        <span>Scroll</span>
+        <span class="hero__cue-line" aria-hidden="true"></span>
+      </a>
     </section>
 
     <section class="photos" id="photos">
       <h2 class="section-label">Photos</h2>
-      <a class="photos__all" href="collections.html">All collections</a>
+      <a class="photos__all pill-link" href="collections.html">All collections</a>
       <div id="trips">
         <div class="trip-band" data-empty="true">
           <div class="trip-band__rail">
@@ -64,8 +68,9 @@
 
   </main>
 
-  <div class="pointer" id="pointer" aria-hidden="true"></div>
+  <div class="pointer" id="pointer" aria-hidden="true"><span class="pointer__label"></span></div>
 
+  <script src="photos.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
