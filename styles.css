@@ -6,6 +6,7 @@
   --muted: rgba(243, 240, 232, 0.55);
   --lede: rgba(243, 240, 232, 0.7);
   --accent: #e39a4b;
+  --placeholder: rgba(243, 240, 232, 0.05);
   --font-body: "Manrope", system-ui, sans-serif;
   --font-display: "Syne", system-ui, sans-serif;
 }
@@ -18,6 +19,7 @@
     --muted: rgba(22, 21, 19, 0.55);
     --lede: rgba(22, 21, 19, 0.7);
     --accent: #b4532a;
+    --placeholder: rgba(22, 21, 19, 0.06);
   }
 
 }
@@ -26,6 +28,31 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Cross-page fade where supported; the top bar stays put and a clicked photo
+   (photo-morph, set in photos.js) grows into its spot on the next page. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-group(photo-morph) {
+  z-index: 10;
+  animation-duration: 550ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Old and new frames can be cropped differently; fill the box instead of stretching. */
+::view-transition-old(photo-morph),
+::view-transition-new(photo-morph) {
+  height: 100%;
+  object-fit: cover;
+  overflow: clip;
+}
+
+.is-morphing .trip-page > *,
+.is-morphing .collection-card {
+  animation: none;
 }
 
 html {
@@ -58,6 +85,15 @@ img {
   max-width: 100%;
 }
 
+.fade-img {
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.fade-img.is-loaded {
+  opacity: 1;
+}
+
 /* —— Top bar —— */
 .topbar {
   position: fixed;
@@ -73,6 +109,7 @@ img {
   background: transparent;
   transition: background-color 200ms ease, border-color 200ms ease;
   border-bottom: 1px solid transparent;
+  view-transition-name: topbar;
 }
 
 .topbar.is-solid {
@@ -257,9 +294,103 @@ img {
   50% { transform: translate(-50%, -50%) translate(8vw, -13.9vw); }
 }
 
+/* Film grain over the lights. */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .hero__content {
   position: relative;
   z-index: 1;
+}
+
+.hero__cue {
+  position: absolute;
+  right: 6vw;
+  bottom: 6vh;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: cue-in 900ms ease 1s both;
+}
+
+.hero__cue-line {
+  position: relative;
+  width: 1px;
+  height: 56px;
+  overflow: hidden;
+  background: var(--hairline);
+}
+
+.hero__cue-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 40%;
+  background: var(--accent);
+  animation: cue-drop 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes cue-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes cue-drop {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(250%); }
+}
+
+/* Hero eases away as the page scrolls, where scroll-linked animation is supported. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .hero__content {
+      animation: hero-out linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 85vh;
+    }
+
+    .hero__lights {
+      animation: hero-lights-out linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100vh;
+    }
+
+    .hero__cue {
+      animation: cue-in 900ms ease 1s both, cue-out linear both;
+      animation-timeline: auto, scroll(root);
+      animation-range: normal, 0 25vh;
+    }
+  }
+}
+
+@keyframes hero-out {
+  to { opacity: 0; transform: translateY(-12vh); filter: blur(8px); }
+}
+
+@keyframes cue-out {
+  to { opacity: 0; }
+}
+
+@keyframes hero-lights-out {
+  to { opacity: 0.2; transform: scale(1.3); }
 }
 
 .hero__name {
@@ -318,9 +449,13 @@ img {
 }
 
 .photos__all {
+  margin: 0 0 28px 6vw;
+}
+
+/* Orange outlined pill link. */
+.pill-link {
   display: inline-block;
   width: fit-content;
-  margin: 0 0 28px 6vw;
   padding: 10px 16px;
   font-family: var(--font-body);
   font-size: 14px;
@@ -336,13 +471,13 @@ img {
   transition: background-color 200ms, color 200ms;
 }
 
-.photos__all:hover,
-.photos__all:focus {
+.pill-link:hover,
+.pill-link:focus {
   background: var(--accent);
   color: var(--ground);
 }
 
-.photos__all:focus {
+.pill-link:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -421,9 +556,9 @@ img {
   to { transform: translateX(-50%); }
 }
 
-/* Cover rows — 160px, natural aspect, no crop.
-   Width is 160 * natural aspect. Three staggered loops. */
+/* Cover rows — natural aspect, no crop. Width is --cover-h * aspect. Three staggered loops. */
 .cover-rows {
+  --cover-h: 160px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -433,7 +568,7 @@ img {
 }
 
 .cover-row {
-  height: 160px;
+  height: var(--cover-h);
   overflow: hidden;
   min-width: 0;
   scroll-behavior: auto;
@@ -444,7 +579,7 @@ img {
   flex-wrap: nowrap;
   width: max-content;
   min-width: max-content;
-  height: 160px;
+  height: var(--cover-h);
   will-change: transform;
 }
 
@@ -462,7 +597,7 @@ img {
   flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
-  height: 160px;
+  height: var(--cover-h);
   padding-right: 12px;
   flex: 0 0 auto;
   width: max-content;
@@ -472,8 +607,11 @@ img {
 .cover-row__link {
   flex: 0 0 auto;
   display: block;
-  height: 160px;
+  height: var(--cover-h);
   line-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--placeholder);
 }
 
 .cover-row__link:focus-visible {
@@ -482,12 +620,37 @@ img {
 }
 
 .cover-row__link img {
-  height: 160px;
+  height: var(--cover-h);
   width: auto;
   max-width: none;
   object-fit: contain;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+@media (min-width: 1024px) {
+  .cover-rows {
+    --cover-h: 210px;
+  }
+}
+
+/* Hovering a photo slows its row (JS) and dims the rest. */
+@media (hover: hover) {
+  .cover-row__link {
+    transition: opacity 350ms ease;
+  }
+
+  .cover-row__link img {
+    transition: opacity 600ms ease, transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cover-rows:has(.cover-row__link:hover) .cover-row__link:not(:hover) {
+    opacity: 0.4;
+  }
+
+  .cover-row__link:hover img {
+    transform: scale(1.06);
+  }
 }
 
 .trip-band__place + .trip-band__place,
@@ -523,12 +686,29 @@ img {
   color: var(--muted);
 }
 
+/* Page content rises in after the collection data arrives. */
+.trip-page > :not(.trip-status) {
+  animation: page-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.trip-page > :nth-child(2) { animation-delay: 60ms; }
+.trip-page > :nth-child(3) { animation-delay: 120ms; }
+.trip-page > :nth-child(n + 4) { animation-delay: 180ms; }
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
 .trip-missing {
   margin: 0 0 1rem;
   font-size: 18px;
 }
 
+/* Phone: one photo per row. Wider: justified rows that keep each photo's shape.
+   --ar comes from the manifest so space is reserved before lazy images load. */
 .trip-grid {
+  --row-h: clamp(220px, 18vw, 340px);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -538,12 +718,14 @@ img {
 .trip-photo {
   display: block;
   width: 100%;
+  aspect-ratio: var(--ar, 1.5);
   margin: 0;
   padding: 0;
+  overflow: hidden;
   border: 0;
-  background: transparent;
+  background: var(--placeholder);
   color: inherit;
-  cursor: pointer;
+  cursor: zoom-in;
 }
 
 .trip-photo:focus-visible {
@@ -551,14 +733,48 @@ img {
   outline-offset: 4px;
 }
 
-.trip-photo img,
-.trip-grid img {
+.trip-photo img {
   width: 100%;
-  height: auto;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (min-width: 721px) {
+  .trip-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 2.5rem;
+  }
+
+  .trip-photo {
+    flex: var(--ar, 1.5) 1 calc(var(--ar, 1.5) * var(--row-h));
+    width: auto;
+    border-radius: 8px;
+  }
+
+  /* Keeps a short last row at its natural size instead of stretching it. */
+  .trip-grid::after {
+    content: "";
+    flex: 1000 1 0;
+  }
+
+  .trip-photo img {
+    transition: opacity 600ms ease, transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .trip-photo:hover img {
+    transform: scale(1.03);
+  }
 }
 
 /* Overlay fades in place. It does not grow from the thumbnail. */
+.viewer-open,
+.viewer-open body {
+  overflow: hidden;
+}
+
 .viewer {
   position: fixed;
   inset: 0;
@@ -566,7 +782,9 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 14, 12, 0.92);
+  background: rgba(14, 14, 12, 0.94);
+  color: #f3f0e8;
+  touch-action: pan-y pinch-zoom;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -582,45 +800,192 @@ img {
 
 .viewer__photo {
   max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 9rem);
   width: auto;
   height: auto;
   object-fit: contain;
   transform: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-.trips-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2.5rem;
-  margin-top: 2.5rem;
-}
-
-.trips-list__item {
+.viewer__btn {
+  position: absolute;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 1rem 1.25rem;
-  align-items: center;
-  width: fit-content;
-  max-width: 100%;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(243, 240, 232, 0.22);
+  border-radius: 50%;
+  background: rgba(14, 14, 12, 0.5);
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }
 
-.trips-list__item img {
-  height: 96px;
-  width: auto;
-  max-width: none;
-  object-fit: contain;
+.viewer__btn:hover,
+.viewer__btn:focus-visible {
+  border-color: #e39a4b;
+  color: #e39a4b;
+  outline: none;
 }
 
-.trips-list__place {
+.viewer__btn[hidden] {
+  display: none;
+}
+
+.viewer__btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.viewer__close {
+  top: 16px;
+  right: 16px;
+}
+
+/* Phone: arrows sit beside the counter at the bottom. */
+.viewer__prev,
+.viewer__next {
+  bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.viewer__prev {
+  left: calc(50% - 110px);
+}
+
+.viewer__next {
+  right: calc(50% - 110px);
+}
+
+.viewer__count {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
   margin: 0;
-  font-size: 16px;
-  font-weight: 500;
+  line-height: 44px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(243, 240, 232, 0.6);
 }
 
-.trips-list__date {
-  margin: 0.35rem 0 0;
-  font-size: 14px;
+.viewer__count[hidden] {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .viewer__photo {
+    max-width: calc(100vw - 10rem);
+    max-height: calc(100vh - 7rem);
+  }
+
+  .viewer__prev,
+  .viewer__next {
+    top: 50%;
+    bottom: auto;
+    width: 52px;
+    height: 52px;
+    transform: translateY(-50%);
+  }
+
+  .viewer__prev {
+    left: 24px;
+  }
+
+  .viewer__next {
+    right: 24px;
+  }
+
+  .viewer__count {
+    bottom: 12px;
+  }
+}
+
+.collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 48px 24px;
+  margin-top: 3rem;
+}
+
+.collection-card {
+  display: block;
+  animation: page-in 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(180ms + var(--i, 0) * 80ms);
+}
+
+.collection-card__media {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--placeholder);
+}
+
+.collection-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 600ms ease, transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.collection-card:hover .collection-card__media img,
+.collection-card:focus-visible .collection-card__media img {
+  transform: scale(1.05);
+}
+
+.collection-card:focus-visible {
+  outline: none;
+}
+
+.collection-card:focus-visible .collection-card__media {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.collection-card__text {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.collection-card__place {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(22px, 2vw, 28px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  transition: color 200ms ease;
+}
+
+.collection-card__place::after {
+  content: " →";
+  display: inline-block;
+  margin-left: 0.15em;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 250ms ease, transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.collection-card:hover .collection-card__place::after {
+  opacity: 1;
+  transform: none;
+}
+
+.collection-card__meta {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -673,6 +1038,34 @@ img {
   background: var(--accent);
 }
 
+.pointer__label {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(0.8);
+  transform-origin: top left;
+  transition: opacity 180ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pointer__label::after {
+  content: " →";
+}
+
+.pointer.has-label .pointer__label {
+  opacity: 1;
+  transform: none;
+}
+
 /* —— Reduced motion —— */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -698,6 +1091,27 @@ img {
   .viewer,
   .viewer.is-open {
     transition: none;
+  }
+
+  .hero__cue,
+  .hero__cue-line::after,
+  .trip-page > *,
+  .collection-card {
+    animation: none !important;
+  }
+
+  .fade-img,
+  .cover-row__link img,
+  .trip-photo img,
+  .collection-card__media img {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 
   .cover-row {

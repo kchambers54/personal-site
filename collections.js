@@ -24,68 +24,81 @@
     return note;
   }
 
+  function card(trip, index) {
+    const link = document.createElement("a");
+    link.className = "collection-card";
+    link.href = "collection.html?slug=" + encodeURIComponent(trip.slug);
+    link.style.setProperty("--i", index);
+
+    const media = document.createElement("div");
+    media.className = "collection-card__media";
+    const cover = trip.images[0];
+    if (cover) {
+      media.dataset.morph = trip.slug + "/" + cover.file;
+      const img = document.createElement("img");
+      img.alt = "";
+      img.loading = index < 3 ? "eager" : "lazy";
+      img.decoding = "async";
+      Photos.fadeIn(img);
+      // The 4:3 frame crops wide photos, so they need extra width to stay sharp.
+      const fill = Math.max(1, (cover.aspect || 1.5) * 0.75).toFixed(2);
+      Photos.setSources(img, trip.slug, cover,
+        "(max-width: 720px) min(calc(88vw * " + fill + "), 800px), min(calc(28vw * " + fill + "), 800px)");
+      media.appendChild(img);
+    }
+    link.appendChild(media);
+
+    const text = document.createElement("div");
+    text.className = "collection-card__text";
+    const place = document.createElement("h2");
+    place.className = "collection-card__place";
+    place.textContent = trip.place || trip.slug;
+    text.appendChild(place);
+
+    const meta = [trip.date, trip.images.length ? Photos.countLabel(trip.images.length) : ""].filter(Boolean);
+    if (meta.length) {
+      const line = document.createElement("p");
+      line.className = "collection-card__meta";
+      line.textContent = meta.join(" · ");
+      text.appendChild(line);
+    }
+    link.appendChild(text);
+    return link;
+  }
+
   function render(trips) {
     document.title = "All collections — Keller Chambers";
     root.replaceChildren();
     root.appendChild(backLink());
     root.appendChild(heading());
 
-    const listable = trips.filter((trip) => trip && trip.slug);
-    if (!listable.length) {
+    if (!trips.length) {
       root.appendChild(emptyLine());
       return;
     }
 
-    const list = document.createElement("div");
-    list.className = "trips-list";
-    listable.forEach((trip, index) => {
-      const link = document.createElement("a");
-      link.className = "trips-list__item";
-      link.href = "collection.html?slug=" + encodeURIComponent(trip.slug);
+    const total = trips.reduce((sum, trip) => sum + trip.images.length, 0);
+    const summary = document.createElement("p");
+    summary.className = "trip-date";
+    summary.textContent = trips.length + (trips.length === 1 ? " collection" : " collections") +
+      " · " + Photos.countLabel(total);
+    root.appendChild(summary);
 
-      const images = Array.isArray(trip.images) ? trip.images : [];
-      if (images[0]) {
-        const img = document.createElement("img");
-        img.src = "photos/" + trip.slug + "/" + images[0];
-        img.alt = "";
-        img.decoding = "async";
-        if (index > 0) img.loading = "lazy";
-        link.appendChild(img);
-      }
-
-      const text = document.createElement("div");
-      if (typeof trip.place === "string" && trip.place.trim()) {
-        const place = document.createElement("p");
-        place.className = "trips-list__place";
-        place.textContent = trip.place.trim();
-        text.appendChild(place);
-      }
-      if (typeof trip.date === "string" && trip.date.trim()) {
-        const date = document.createElement("p");
-        date.className = "trips-list__date";
-        date.textContent = trip.date.trim();
-        text.appendChild(date);
-      }
-      link.appendChild(text);
-      list.appendChild(link);
-    });
-    root.appendChild(list);
+    const grid = document.createElement("div");
+    grid.className = "collections-grid";
+    trips.forEach((trip, index) => grid.appendChild(card(trip, index)));
+    root.appendChild(grid);
   }
 
-  fetch("photos/collections.json")
-    .then((res) => {
-      if (!res.ok) throw new Error("trips fetch failed");
-      return res.json();
-    })
-    .then((data) => {
-      const trips = data && Array.isArray(data.trips) ? data.trips : [];
-      render(trips);
+  // Render from this tab's cached manifest before first paint, then refresh if it changed.
+  const early = Photos.cached();
+  if (early) render(early);
+
+  Photos.load()
+    .then((trips) => {
+      if (!early || JSON.stringify(trips) !== JSON.stringify(early)) render(trips);
     })
     .catch(() => {
-      document.title = "All collections — Keller Chambers";
-      root.replaceChildren();
-      root.appendChild(backLink());
-      root.appendChild(heading());
-      root.appendChild(emptyLine());
+      if (!early) render([]);
     });
 })();
