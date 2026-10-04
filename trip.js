@@ -65,17 +65,17 @@
   }
 
   function showMissing() {
-    document.title = "Trip not found — Keller Chambers";
+    document.title = "Collection not found — Keller Chambers";
     root.replaceChildren();
     const note = document.createElement("p");
     note.className = "trip-missing";
-    note.textContent = "That trip isn't here.";
+    note.textContent = "That collection isn't here.";
     root.appendChild(note);
     root.appendChild(linkHome("Back home", "index.html"));
   }
 
   function renderTrip(trip) {
-    const place = trip.place || "Trip";
+    const place = trip.place || "Collection";
     document.title = place + " — Keller Chambers";
     root.replaceChildren();
     root.appendChild(linkHome("All photos", "index.html#photos"));
