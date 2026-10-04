@@ -73,7 +73,9 @@
   // Each homepage row shows every photo from every collection.
   // The full list is shuffled once per row on load. Later resizes keep that order.
   const COVER_HEIGHT = 160;
+  // One full strip used to take LOOP_MS. Pace is now 0.2 times that (80% slower).
   const LOOP_MS = 48000;
+  const SPEED_SCALE = 0.2;
   const PLACEHOLDER_W = 240;
 
   function mod(n, m) {
@@ -194,6 +196,8 @@
       travelPx: [0, 0, 0],
       nudges: [0, 0, 0],
       orders: distinctOrders(frames),
+      // Once per load, within ±5% of the new base. Not re-rolled on resize or drag.
+      speedFactors: [0, 1, 2].map(() => 0.95 + Math.random() * 0.1),
       ready: false
     };
 
@@ -312,7 +316,7 @@
         for (let i = 0; i < rowEntries.length; i += 1) {
           const w = state.rowWidths[i];
           if (!(w > 0)) continue;
-          const delta = dt * (w / LOOP_MS);
+          const delta = dt * (w / LOOP_MS) * SPEED_SCALE * state.speedFactors[i];
           state.travelPx[i] += delta;
           // The finger owns the dragged row. Cancel that row's auto step so the
           // others keep moving and this one resumes from the dragged offset.
@@ -432,21 +436,9 @@
             set.appendChild(makeCoverLink(frame, false, knownWidths));
           });
 
-          let guard = 0;
-          while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
-            const before = set.getBoundingClientRect().width;
-            order.forEach((frame) => {
-              set.appendChild(makeCoverLink(frame, true, knownWidths));
-            });
-            if (set.getBoundingClientRect().width <= before + 1) break;
-            guard += 1;
-          }
-
+          // One cycle is the permutation itself. The clone is the next copy,
+          // so the last photo sits next to the first and they are not the same.
           const links = [...set.querySelectorAll("a")];
-          links.slice(order.length).forEach((link) => {
-            link.tabIndex = -1;
-            link.setAttribute("aria-hidden", "true");
-          });
           if (i > 0) {
             hideLinks(set);
             set.setAttribute("aria-hidden", "true");
