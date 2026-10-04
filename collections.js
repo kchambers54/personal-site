@@ -41,7 +41,7 @@
     listable.forEach((trip, index) => {
       const link = document.createElement("a");
       link.className = "trips-list__item";
-      link.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
+      link.href = "collection.html?slug=" + encodeURIComponent(trip.slug);
 
       const images = Array.isArray(trip.images) ? trip.images : [];
       if (images[0]) {
@@ -72,7 +72,7 @@
     root.appendChild(list);
   }
 
-  fetch("photos/trips.json")
+  fetch("photos/collections.json")
     .then((res) => {
       if (!res.ok) throw new Error("trips fetch failed");
       return res.json();

@@ -70,8 +70,8 @@
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
-  // Homepage shows one cover per trip (images[0] only). Other frames live on trip.html.
-  // Loop at most the latest 12 trips: the last 12 entries in trips.json order.
+  // Homepage shows one cover per collection (images[0] only). Other frames live on collection.html.
+  // Loop at most the latest 12 collections: the last 12 entries in collections.json order.
   const MAX_LOOP_COVERS = 12;
   const COVER_HEIGHT = 160;
   const LOOP_MS = 48000;
@@ -89,7 +89,7 @@
     const link = document.createElement("a");
     link.className = "cover-row__link";
     link.draggable = false;
-    link.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
+    link.href = "collection.html?slug=" + encodeURIComponent(trip.slug);
     const place = trip.place || "this collection";
     if (hidden) {
       link.tabIndex = -1;
@@ -416,10 +416,10 @@
     }
   }
 
-  // Load trips from photos/trips.json (relative URL for /personal-site/ Pages)
+  // Load collections from photos/collections.json (relative URL for /personal-site/ Pages)
   (async function loadTrips() {
     try {
-      const res = await fetch("photos/trips.json");
+      const res = await fetch("photos/collections.json");
       if (!res.ok) throw new Error("trips fetch failed");
       const data = await res.json();
       const trips = data && Array.isArray(data.trips) ? data.trips : [];

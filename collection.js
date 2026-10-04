@@ -118,7 +118,7 @@
     return;
   }
 
-  fetch("photos/trips.json")
+  fetch("photos/collections.json")
     .then((res) => {
       if (!res.ok) throw new Error("trips fetch failed");
       return res.json();
