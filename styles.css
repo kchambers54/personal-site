@@ -297,14 +297,6 @@ img {
   to { transform: translateY(0); }
 }
 
-.hero__lede {
-  margin: 1.25rem 0 0;
-  max-width: 28ch;
-  font-size: 20px;
-  font-weight: 400;
-  color: var(--lede);
-}
-
 /* —— Shared section label —— */
 .section-label {
   margin: 0 0 2rem;
@@ -322,18 +314,37 @@ img {
 }
 
 .photos .section-label {
-  margin-bottom: 0.75rem;
+  margin-bottom: 16px;
 }
 
 .photos__all {
-  display: block;
+  display: inline-block;
   width: fit-content;
-  margin: 0 0 1.25rem;
-  padding-left: 6vw;
+  margin: 0 0 28px 6vw;
+  padding: 10px 16px;
   font-family: var(--font-body);
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 500;
+  letter-spacing: 0.04em;
   line-height: 1.2;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: none;
+  transition: background-color 200ms, color 200ms;
+}
+
+.photos__all:hover,
+.photos__all:focus {
+  background: var(--accent);
+  color: var(--ground);
+}
+
+.photos__all:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .trip-band {
@@ -470,6 +481,8 @@ img {
   width: auto;
   max-width: none;
   object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
 }
 
 .trip-band__place + .trip-band__place,
@@ -751,4 +764,128 @@ img {
     gap: 1rem;
   }
 
+}
+
+/* Phone lights only. Desktop swirl, sizes, colors, and 8s/48s timing stay above. */
+@media (max-width: 700px) {
+  .hero__swirl {
+    animation: none;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hero__light {
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  }
+
+  .hero__light--1 {
+    width: 280px;
+    height: 280px;
+    left: 4%;
+    top: 6%;
+    filter: blur(48px);
+    opacity: 0.55;
+    animation-name: phone-drift-1, phone-pulse;
+    animation-duration: 14s, 10s;
+    animation-delay: 0s, 0s;
+  }
+
+  .hero__light--2 {
+    width: 180px;
+    height: 180px;
+    left: 68%;
+    top: 10%;
+    filter: blur(36px);
+    opacity: 0.35;
+    animation-name: phone-drift-2;
+    animation-duration: 22s;
+    animation-delay: -5s;
+  }
+
+  .hero__light--3 {
+    width: 240px;
+    height: 240px;
+    left: 0;
+    top: 36%;
+    filter: blur(48px);
+    opacity: 0.55;
+    animation-name: phone-drift-3, phone-pulse;
+    animation-duration: 17s, 10s;
+    animation-delay: -3s, -2s;
+  }
+
+  .hero__light--4 {
+    width: 220px;
+    height: 220px;
+    left: 74%;
+    top: 42%;
+    filter: blur(48px);
+    opacity: 0.55;
+    animation-name: phone-drift-4, phone-pulse;
+    animation-duration: 19s, 10s;
+    animation-delay: -8s, -4s;
+  }
+
+  .hero__light--5 {
+    width: 160px;
+    height: 160px;
+    left: 78%;
+    top: 70%;
+    filter: blur(36px);
+    opacity: 0.35;
+    animation-name: phone-drift-5;
+    animation-duration: 15s;
+    animation-delay: -2s;
+  }
+
+  .hero__light--6 {
+    width: 200px;
+    height: 200px;
+    left: 8%;
+    top: 64%;
+    filter: blur(36px);
+    opacity: 0.55;
+    animation-name: phone-drift-6;
+    animation-duration: 21s;
+    animation-delay: -11s;
+  }
+}
+
+@keyframes phone-drift-1 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(32vw, 42vh); }
+}
+@keyframes phone-drift-2 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-36vw, 44vh); }
+}
+@keyframes phone-drift-3 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(34vw, -40vh); }
+}
+@keyframes phone-drift-4 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-30vw, 46vh); }
+}
+@keyframes phone-drift-5 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-38vw, -42vh); }
+}
+@keyframes phone-drift-6 {
+  from { transform: translate(0, 0); }
+  to { transform: translate(40vw, 40vh); }
+}
+@keyframes phone-pulse {
+  from { scale: 1; }
+  to { scale: 1.08; }
+}
+
+@media (max-width: 700px) and (prefers-reduced-motion: reduce) {
+  .hero__light {
+    animation: none;
+  }
 }
