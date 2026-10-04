@@ -441,7 +441,9 @@ img {
 
 .cover-row__track {
   display: flex;
+  flex-wrap: nowrap;
   width: max-content;
+  min-width: max-content;
   height: 160px;
   will-change: transform;
 }
@@ -457,11 +459,14 @@ img {
 
 .cover-row__set {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
   height: 160px;
   padding-right: 12px;
   flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
 }
 
 .cover-row__link {
