@@ -20,11 +20,6 @@
     --accent: #b4532a;
   }
 
-  .hero__light--2,
-  .hero__light--5 {
-    background: #d9c49a;
-    opacity: 0.55;
-  }
 }
 
 *,
@@ -176,7 +171,7 @@ img {
 .hero__light--3 {
   width: 11vw;
   height: 11vw;
-  background: #c47d72;
+  background: #6f8fbf;
   opacity: 0.42;
   filter: blur(24px);
   animation-name: light-sine-3;
@@ -206,11 +201,29 @@ img {
 .hero__light--6 {
   width: 10vw;
   height: 10vw;
-  background: #c47d72;
+  background: #6f8fbf;
   opacity: 0.44;
   filter: blur(22px);
   animation-name: light-sine-6;
   animation-delay: -6.67s;
+}
+
+/* After the base light rules so these win in light mode. Color only. */
+@media (prefers-color-scheme: light) {
+  .hero__light--1,
+  .hero__light--4 {
+    background: #b4532a;
+  }
+
+  .hero__light--2,
+  .hero__light--5 {
+    background: #d9c49a;
+  }
+
+  .hero__light--3,
+  .hero__light--6 {
+    background: #2c4a7c;
+  }
 }
 
 /* Angles ~0°, 60°, 120°, 180°, 240°, 300°; distinct inner/outer radii. */
@@ -306,6 +319,21 @@ img {
 /* —— Photos —— */
 .photos {
   padding: 4rem 0 0;
+}
+
+.photos .section-label {
+  margin-bottom: 0.75rem;
+}
+
+.photos__all {
+  display: block;
+  width: fit-content;
+  margin: 0 0 1.25rem;
+  padding-left: 6vw;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .trip-band {
@@ -444,30 +472,9 @@ img {
   object-fit: contain;
 }
 
-.cover-rows__controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 4px 6vw 0;
-}
-
-.cover-rows__all {
-  font-size: 14px;
-  font-weight: 500;
-}
-
 .trip-band__place + .trip-band__place,
 .trip-band__date + .trip-band__place {
   margin-top: 1.25rem;
-}
-
-.trip-band__all {
-  display: block;
-  width: fit-content;
-  margin-top: 1.15rem;
-  font-size: 14px;
-  font-weight: 500;
 }
 
 /* —— Trip page —— */
