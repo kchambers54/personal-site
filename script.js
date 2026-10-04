@@ -88,8 +88,9 @@
   function makeCoverLink(trip, hidden) {
     const link = document.createElement("a");
     link.className = "cover-row__link";
+    link.draggable = false;
     link.href = "trip.html?slug=" + encodeURIComponent(trip.slug);
-    const place = trip.place || "this trip";
+    const place = trip.place || "this collection";
     if (hidden) {
       link.tabIndex = -1;
       link.setAttribute("aria-hidden", "true");
@@ -156,7 +157,7 @@
     const stage = document.createElement("div");
     stage.className = "cover-rows";
     stage.setAttribute("role", "region");
-    stage.setAttribute("aria-label", "Trips");
+    stage.setAttribute("aria-label", "Collections");
 
     const rowEntries = [0, 1, 2].map(() => {
       const row = document.createElement("div");
@@ -171,32 +172,13 @@
     const controls = document.createElement("div");
     controls.className = "cover-rows__controls";
 
-    const prev = document.createElement("button");
-    prev.type = "button";
-    prev.className = "cover-rows__arrow";
-    prev.setAttribute("aria-label", "Previous");
-    prev.textContent = "Previous";
-
-    const next = document.createElement("button");
-    next.type = "button";
-    next.className = "cover-rows__arrow";
-    next.setAttribute("aria-label", "Next");
-    next.textContent = "Next";
-
-    const allTrips = document.createElement("a");
-    allTrips.className = "cover-rows__all";
-    allTrips.href = "trips.html";
-    allTrips.textContent = "All trips";
-
-    controls.appendChild(prev);
-    controls.appendChild(next);
-    controls.appendChild(allTrips);
+    const allCollections = document.createElement("a");
+    allCollections.className = "cover-rows__all";
+    allCollections.href = "collections.html";
+    allCollections.textContent = "All collections";
+    controls.appendChild(allCollections);
     stage.appendChild(controls);
     root.replaceChildren(stage);
-
-    function held() {
-      return stage.matches(":hover") || stage.contains(document.activeElement);
-    }
 
     function visualPos(i) {
       const w = state.setWidth;
@@ -212,41 +194,95 @@
     }
 
     let lastTick = performance.now();
+    let rafId = 0;
+    let loopGen = 0;
+
     function frame(ts) {
       const now = typeof ts === "number" ? ts : performance.now();
       const dt = now - lastTick;
       lastTick = now;
-      if (dt > 0 && !state.reduced && state.ready && state.setWidth > 0 && !held()) {
+      const hidden = document.visibilityState === "hidden";
+      // A suspended or hidden gap must not jump the rows forward.
+      if (!hidden && dt > 0 && dt < 200 && !state.reduced && state.ready && state.setWidth > 0) {
         state.travel += dt * (state.setWidth / LOOP_MS);
       }
       apply();
-      requestAnimationFrame(frame);
     }
-    requestAnimationFrame(frame);
 
-    function skip(dir) {
-      if (!state.steps.length || !state.setWidth) return;
-      let step;
-      if (dir > 0) {
-        step = state.steps[state.index % state.steps.length];
-        state.index = (state.index + 1) % state.steps.length;
-      } else {
-        state.index = (state.index - 1 + state.steps.length) % state.steps.length;
-        step = state.steps[state.index];
-      }
-      const px = dir * step;
-      state.nudge = mod(state.nudge + px, state.setWidth);
+    function resumeClock() {
+      lastTick = performance.now();
+      loopGen += 1;
+      const gen = loopGen;
+      if (rafId) cancelAnimationFrame(rafId);
+      const step = (ts) => {
+        if (gen !== loopGen) return;
+        frame(ts);
+        rafId = requestAnimationFrame(step);
+      };
+      rafId = requestAnimationFrame(step);
+    }
+
+    resumeClock();
+    window.addEventListener("pageshow", resumeClock);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") resumeClock();
+      else lastTick = performance.now();
+    });
+    document.addEventListener("freeze", () => { lastTick = performance.now(); });
+    document.addEventListener("resume", resumeClock);
+
+    // Touch drag moves the shared offset. A tap still follows the link.
+    const DRAG_START = 10;
+    let drag = null;
+    let blockClick = false;
+
+    function nudgeBy(dx) {
+      if (!state.setWidth) return;
       if (state.reduced) {
         rowEntries.forEach((entry) => {
-          entry.row.scrollLeft = mod(entry.row.scrollLeft + px, state.setWidth);
+          entry.row.scrollLeft = mod(entry.row.scrollLeft - dx, state.setWidth);
         });
         return;
       }
+      state.nudge = mod(state.nudge - dx, state.setWidth);
       apply();
     }
 
-    prev.addEventListener("click", () => skip(-1));
-    next.addEventListener("click", () => skip(1));
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch" || !e.isPrimary) return;
+      drag = { id: e.pointerId, x: e.clientX, lastX: e.clientX, dragged: false };
+      if (stage.setPointerCapture) {
+        try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      }
+    });
+
+    stage.addEventListener("pointermove", (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.lastX;
+      drag.lastX = e.clientX;
+      if (!drag.dragged && Math.abs(e.clientX - drag.x) >= DRAG_START) drag.dragged = true;
+      if (!drag.dragged) return;
+      nudgeBy(dx);
+      e.preventDefault();
+    }, { passive: false });
+
+    function endDrag(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dragged = drag.dragged;
+      drag = null;
+      if (!dragged) return;
+      blockClick = true;
+      window.setTimeout(() => { blockClick = false; }, 500);
+    }
+
+    stage.addEventListener("pointerup", endDrag);
+    stage.addEventListener("pointercancel", endDrag);
+    stage.addEventListener("click", (e) => {
+      if (!blockClick) return;
+      blockClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
 
     function hideLinks(node) {
       node.querySelectorAll("a").forEach((link) => {
@@ -431,7 +467,7 @@
     );
 
     document.addEventListener("mouseover", (e) => {
-      const link = e.target.closest("a, .projects__line");
+      const link = e.target.closest("a");
       pointer.classList.toggle("is-accent", Boolean(link));
     });
 

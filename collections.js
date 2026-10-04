@@ -1,5 +1,5 @@
 (function () {
-  const root = document.getElementById("all-trips");
+  const root = document.getElementById("all-collections");
   if (!root) return;
 
   function backLink() {
@@ -13,19 +13,19 @@
   function heading() {
     const h = document.createElement("h1");
     h.className = "trip-place";
-    h.textContent = "All trips";
+    h.textContent = "All collections";
     return h;
   }
 
   function emptyLine() {
     const note = document.createElement("p");
     note.className = "trips-empty";
-    note.textContent = "No trips yet";
+    note.textContent = "No collections yet";
     return note;
   }
 
   function render(trips) {
-    document.title = "All trips — Keller Chambers";
+    document.title = "All collections — Keller Chambers";
     root.replaceChildren();
     root.appendChild(backLink());
     root.appendChild(heading());
@@ -82,7 +82,7 @@
       render(trips);
     })
     .catch(() => {
-      document.title = "All trips — Keller Chambers";
+      document.title = "All collections — Keller Chambers";
       root.replaceChildren();
       root.appendChild(backLink());
       root.appendChild(heading());
