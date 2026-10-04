@@ -70,27 +70,89 @@
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
-  // Homepage shows one cover per collection (images[0] only). Other frames live on collection.html.
-  // Loop at most the latest 12 collections: the last 12 entries in collections.json order.
-  const MAX_LOOP_COVERS = 12;
+  // Each homepage row shows every photo from every collection.
+  // The full list is shuffled once per row on load. Later resizes keep that order.
   const COVER_HEIGHT = 160;
   const LOOP_MS = 48000;
-
-  function coverSrc(trip) {
-    return "photos/" + trip.slug + "/" + trip.images[0];
-  }
+  const PLACEHOLDER_W = 240;
 
   function mod(n, m) {
     if (!m) return 0;
     return ((n % m) + m) % m;
   }
 
-  function makeCoverLink(trip, hidden) {
+  function frameKey(frame) {
+    return frame.slug + "/" + frame.file;
+  }
+
+  function flattenFrames(trips) {
+    const frames = [];
+    trips.forEach((trip) => {
+      if (!trip || !trip.slug || !Array.isArray(trip.images)) return;
+      trip.images.forEach((file) => {
+        if (!file) return;
+        frames.push({
+          slug: trip.slug,
+          file: file,
+          place: typeof trip.place === "string" ? trip.place : ""
+        });
+      });
+    });
+    return frames;
+  }
+
+  function shuffleFrames(list) {
+    const copy = list.slice();
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = tmp;
+    }
+    return copy;
+  }
+
+  function sameOrder(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i].slug !== b[i].slug || a[i].file !== b[i].file) return false;
+    }
+    return true;
+  }
+
+  function distinctOrders(frames) {
+    const orders = [];
+    let guard = 0;
+    while (orders.length < 3 && guard < 40) {
+      const next = shuffleFrames(frames);
+      const clash = orders.some((order) => sameOrder(order, next));
+      guard += 1;
+      if (clash) continue;
+      orders.push(next);
+    }
+    while (orders.length < 3) orders.push(frames.slice());
+    if (frames.length > 1) {
+      for (let i = 0; i < orders.length; i += 1) {
+        for (let j = 0; j < i; j += 1) {
+          if (!sameOrder(orders[i], orders[j])) continue;
+          const swapped = orders[i].slice();
+          const tmp = swapped[0];
+          swapped[0] = swapped[1];
+          swapped[1] = tmp;
+          orders[i] = swapped;
+        }
+      }
+    }
+    return orders;
+  }
+
+  function makeCoverLink(frame, hidden, knownWidths) {
     const link = document.createElement("a");
     link.className = "cover-row__link";
     link.draggable = false;
-    link.href = "collection.html?slug=" + encodeURIComponent(trip.slug);
-    const place = trip.place || "this collection";
+    link.href = "collection.html?slug=" + encodeURIComponent(frame.slug);
+    link.dataset.frame = frameKey(frame);
+    const place = frame.place || "this collection";
     if (hidden) {
       link.tabIndex = -1;
       link.setAttribute("aria-hidden", "true");
@@ -99,36 +161,17 @@
     }
 
     const img = document.createElement("img");
-    img.src = coverSrc(trip);
-    img.alt = hidden ? "" : (typeof trip.place === "string" ? trip.place : "");
+    img.dataset.src = "photos/" + frame.slug + "/" + frame.file;
+    img.alt = hidden ? "" : place;
     img.draggable = false;
     img.decoding = "async";
-    link.appendChild(img);
-    return link;
-  }
-
-  function sizeCoverLink(link) {
-    const img = link.querySelector("img");
-    if (!img || !img.naturalWidth || !img.naturalHeight) return false;
-    const width = (COVER_HEIGHT * img.naturalWidth) / img.naturalHeight;
+    const width = knownWidths.get(frameKey(frame)) || PLACEHOLDER_W;
     img.style.height = COVER_HEIGHT + "px";
     img.style.width = width + "px";
     img.style.objectFit = "contain";
     link.style.width = width + "px";
     link.style.height = COVER_HEIGHT + "px";
-    return true;
-  }
-
-  async function prepareCoverLink(link) {
-    const img = link.querySelector("img");
-    if (img && img.decode) {
-      try {
-        await img.decode();
-      } catch (err) {
-        // Broken frame: leave it unsized rather than inventing a crop.
-      }
-    }
-    sizeCoverLink(link);
+    link.appendChild(img);
     return link;
   }
 
@@ -136,21 +179,21 @@
     const root = document.getElementById("trips");
     if (!root) return;
 
-    const shown = trips.length > MAX_LOOP_COVERS
-      ? trips.slice(trips.length - MAX_LOOP_COVERS)
-      : trips.slice();
+    const frames = flattenFrames(trips);
+    if (!frames.length) return;
+
+    const knownWidths = new Map();
 
     const state = {
       token: 0,
       reduced: motionReduced(),
-      setWidth: 0,
+      rowWidths: [0, 0, 0],
       stripWidths: [0, 0, 0],
-      steps: [],
-      index: 0,
       phases: [0, 0, 0],
       dirs: [1, -1, 1],
-      travel: 0,
+      travelPx: [0, 0, 0],
       nudges: [0, 0, 0],
+      orders: distinctOrders(frames),
       ready: false
     };
 
@@ -172,15 +215,86 @@
     root.replaceChildren(stage);
 
     function visualPos(i) {
-      const w = state.setWidth;
+      const w = state.rowWidths[i];
       if (!w) return 0;
-      return mod(state.phases[i] + state.dirs[i] * state.travel + state.nudges[i], w);
+      if (state.reduced) return mod(rowEntries[i].row.scrollLeft, w);
+      return mod(state.phases[i] + state.dirs[i] * state.travelPx[i] + state.nudges[i], w);
     }
 
     function apply() {
-      if (state.reduced || !state.setWidth) return;
+      if (state.reduced) return;
       rowEntries.forEach((entry, i) => {
+        if (!state.rowWidths[i]) return;
         entry.track.style.transform = "translate3d(" + (-visualPos(i)) + "px,0,0)";
+      });
+    }
+
+    function applyMeasuredWidth(key, width) {
+      if (!key || !(width > 0)) return;
+      knownWidths.set(key, width);
+      rowEntries.forEach((entry, i) => {
+        const prevW = state.rowWidths[i];
+        const pos = state.ready && prevW ? visualPos(i) : 0;
+        const rowRect = entry.row.getBoundingClientRect();
+        let shift = 0;
+        entry.track.querySelectorAll("a").forEach((link) => {
+          if (link.dataset.frame !== key) return;
+          const before = link.getBoundingClientRect();
+          if (Math.abs(before.width - width) < 0.5) return;
+          const img = link.querySelector("img");
+          if (img) {
+            img.style.width = width + "px";
+            img.style.height = COVER_HEIGHT + "px";
+            img.style.objectFit = "contain";
+          }
+          link.style.width = width + "px";
+          link.style.height = COVER_HEIGHT + "px";
+          if (before.right <= rowRect.left + 0.5) shift += width - before.width;
+        });
+        const set = entry.track.querySelector("[data-cover-set='original']");
+        if (!set) return;
+        const newW = set.getBoundingClientRect().width;
+        if (!(newW > 0)) return;
+        state.rowWidths[i] = newW;
+        if (!state.ready) return;
+        const target = pos + shift;
+        if (state.reduced) {
+          entry.row.scrollLeft = mod(target, newW);
+          return;
+        }
+        state.nudges[i] = mod(target - state.phases[i] - state.dirs[i] * state.travelPx[i], newW);
+      });
+      apply();
+    }
+
+    function armImage(img) {
+      if (!img || img.dataset.armed === "1") return;
+      img.dataset.armed = "1";
+      img.addEventListener("load", () => {
+        if (!img.naturalWidth || !img.naturalHeight) return;
+        const link = img.closest("a");
+        if (!link) return;
+        const width = (COVER_HEIGHT * img.naturalWidth) / img.naturalHeight;
+        applyMeasuredWidth(link.dataset.frame, width);
+      });
+    }
+
+    function nearView(link, row) {
+      const tile = link.getBoundingClientRect();
+      const box = row.getBoundingClientRect();
+      const margin = box.width || window.innerWidth || PLACEHOLDER_W;
+      return tile.right >= box.left - margin && tile.left <= box.right + margin;
+    }
+
+    function reveal() {
+      rowEntries.forEach((entry) => {
+        entry.track.querySelectorAll("img").forEach((img) => {
+          if (img.getAttribute("src") || !img.dataset.src) return;
+          const link = img.closest("a");
+          if (!link || !nearView(link, entry.row)) return;
+          armImage(img);
+          img.src = img.dataset.src;
+        });
       });
     }
 
@@ -194,17 +308,21 @@
       lastTick = now;
       const hidden = document.visibilityState === "hidden";
       // A suspended or hidden gap must not jump the rows forward.
-      if (!hidden && dt > 0 && dt < 200 && !state.reduced && state.ready && state.setWidth > 0) {
-        const delta = dt * (state.setWidth / LOOP_MS);
-        state.travel += delta;
-        // The finger owns the dragged row. Cancel that row's auto step so the
-        // others keep moving and this one resumes from the dragged offset.
-        if (drag && drag.dragged) {
-          const i = drag.index;
-          state.nudges[i] = mod(state.nudges[i] - state.dirs[i] * delta, state.setWidth);
+      if (!hidden && dt > 0 && dt < 200 && !state.reduced && state.ready) {
+        for (let i = 0; i < rowEntries.length; i += 1) {
+          const w = state.rowWidths[i];
+          if (!(w > 0)) continue;
+          const delta = dt * (w / LOOP_MS);
+          state.travelPx[i] += delta;
+          // The finger owns the dragged row. Cancel that row's auto step so the
+          // others keep moving and this one resumes from the dragged offset.
+          if (drag && drag.dragged && drag.index === i) {
+            state.nudges[i] = mod(state.nudges[i] - state.dirs[i] * delta, w);
+          }
         }
       }
       apply();
+      reveal();
     }
 
     function resumeClock() {
@@ -235,13 +353,14 @@
     let blockClick = false;
 
     function nudgeRow(index, dx) {
-      if (!state.setWidth) return;
+      const w = state.rowWidths[index];
+      if (!w) return;
       if (state.reduced) {
         const entry = rowEntries[index];
-        entry.row.scrollLeft = mod(entry.row.scrollLeft - dx, state.setWidth);
+        entry.row.scrollLeft = mod(entry.row.scrollLeft - dx, w);
         return;
       }
-      state.nudges[index] = mod(state.nudges[index] - dx, state.setWidth);
+      state.nudges[index] = mod(state.nudges[index] - dx, w);
       apply();
     }
 
@@ -275,6 +394,7 @@
 
       entry.row.addEventListener("pointerup", endDrag);
       entry.row.addEventListener("pointercancel", endDrag);
+      entry.row.addEventListener("scroll", () => reveal(), { passive: true });
     });
     stage.addEventListener("click", (e) => {
       if (!blockClick) return;
@@ -292,75 +412,61 @@
 
     let resizeTimer = 0;
 
-    async function layout() {
+    function layout() {
       const my = ++state.token;
       const viewport = rowEntries[0].row.clientWidth;
       const measurer = document.createElement("div");
       measurer.className = "cover-row__measure";
-      const set = document.createElement("div");
-      set.className = "cover-row__set";
-      set.setAttribute("data-cover-set", "original");
-      measurer.appendChild(set);
       stage.appendChild(measurer);
 
       try {
-        for (const trip of shown) {
-          const link = makeCoverLink(trip, false);
-          set.appendChild(link);
-          await prepareCoverLink(link);
+        const built = [];
+        for (let i = 0; i < state.orders.length; i += 1) {
           if (my !== state.token) return;
-        }
+          const order = state.orders[i];
+          const set = document.createElement("div");
+          set.className = "cover-row__set";
+          set.setAttribute("data-cover-set", "original");
+          measurer.appendChild(set);
+          order.forEach((frame) => {
+            set.appendChild(makeCoverLink(frame, false, knownWidths));
+          });
 
-        let guard = 0;
-        while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
-          const before = set.getBoundingClientRect().width;
-          for (const trip of shown) {
-            const link = makeCoverLink(trip, true);
-            set.appendChild(link);
-            await prepareCoverLink(link);
-            if (my !== state.token) return;
+          let guard = 0;
+          while (viewport > 0 && set.getBoundingClientRect().width <= viewport + 1 && guard < 24) {
+            const before = set.getBoundingClientRect().width;
+            order.forEach((frame) => {
+              set.appendChild(makeCoverLink(frame, true, knownWidths));
+            });
+            if (set.getBoundingClientRect().width <= before + 1) break;
+            guard += 1;
           }
-          if (set.getBoundingClientRect().width <= before + 1) break;
-          guard += 1;
+
+          const links = [...set.querySelectorAll("a")];
+          links.slice(order.length).forEach((link) => {
+            link.tabIndex = -1;
+            link.setAttribute("aria-hidden", "true");
+          });
+          if (i > 0) {
+            hideLinks(set);
+            set.setAttribute("aria-hidden", "true");
+          }
+
+          const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
+          const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
+          const first = links[0];
+          const firstW = first ? first.getBoundingClientRect().width : PLACEHOLDER_W;
+          const setWidth = set.getBoundingClientRect().width;
+          if (!(setWidth > 0) || !first) return;
+          built.push({
+            set: set,
+            setWidth: setWidth,
+            stride: firstW + gapPx,
+            half: firstW / 2
+          });
         }
 
-        if (my !== state.token) return;
-
-        const gapValue = Number.parseFloat(getComputedStyle(set).columnGap);
-        const gapPx = Number.isFinite(gapValue) ? gapValue : 12;
-        const cycle = [...set.querySelectorAll("a")].slice(0, shown.length);
-        if (!cycle.length) return;
-
-        const steps = cycle.map((link) => link.getBoundingClientRect().width + gapPx);
-        const setWidth = set.getBoundingClientRect().width;
-        const half = cycle[0].getBoundingClientRect().width / 2;
-        const stride = steps[0];
-        if (setWidth <= 0) return;
-
-        [...set.querySelectorAll("a")].slice(shown.length).forEach((link) => {
-          link.tabIndex = -1;
-          link.setAttribute("aria-hidden", "true");
-        });
-
-        const loopClone = set.cloneNode(true);
-        loopClone.setAttribute("aria-hidden", "true");
-        loopClone.setAttribute("data-cover-set", "clone");
-        hideLinks(loopClone);
-
-        if (my !== state.token) return;
-
-        rowEntries[0].row.removeAttribute("aria-hidden");
-        rowEntries[0].track.replaceChildren(set, loopClone);
-
-        for (let i = 1; i < rowEntries.length; i += 1) {
-          const copySet = set.cloneNode(true);
-          const copyLoop = loopClone.cloneNode(true);
-          hideLinks(copySet);
-          hideLinks(copyLoop);
-          copySet.setAttribute("aria-hidden", "true");
-          rowEntries[i].row.setAttribute("aria-hidden", "true");
-          rowEntries[i].track.replaceChildren(copySet, copyLoop);
-        }
+        if (built.length !== 3 || my !== state.token) return;
 
         const carried = !state.ready
           ? null
@@ -368,14 +474,23 @@
             ? rowEntries.map((entry) => entry.row.scrollLeft)
             : [0, 1, 2].map((i) => visualPos(i)));
 
-        state.steps = steps;
-        state.setWidth = setWidth;
-        state.phases = [0, stride, half];
+        built.forEach((item, i) => {
+          const loopClone = item.set.cloneNode(true);
+          loopClone.setAttribute("aria-hidden", "true");
+          loopClone.setAttribute("data-cover-set", "clone");
+          hideLinks(loopClone);
+          if (i === 0) rowEntries[i].row.removeAttribute("aria-hidden");
+          else rowEntries[i].row.setAttribute("aria-hidden", "true");
+          rowEntries[i].track.replaceChildren(item.set, loopClone);
+        });
+
+        state.phases = [0, built[0].stride, built[0].half];
+        state.rowWidths = built.map((item) => item.setWidth);
         state.reduced = motionReduced();
         state.stripWidths = rowEntries.map((entry) => entry.row.clientWidth || viewport);
         if (carried && !state.reduced) {
           state.nudges = carried.map((pos, i) =>
-            mod(pos - state.phases[i] - state.dirs[i] * state.travel, setWidth)
+            mod(pos - state.phases[i] - state.dirs[i] * state.travelPx[i], state.rowWidths[i])
           );
         } else if (!carried) {
           state.nudges = [0, 0, 0];
@@ -386,13 +501,14 @@
           rowEntries.forEach((entry) => {
             entry.track.style.transform = "";
           });
-          const base = carried || [0, stride, half];
+          const base = carried || state.phases.slice();
           rowEntries.forEach((entry, i) => {
-            entry.row.scrollLeft = mod(base[i] || 0, setWidth);
+            entry.row.scrollLeft = mod(base[i] || 0, state.rowWidths[i]);
           });
         } else {
           apply();
         }
+        reveal();
       } finally {
         if (measurer.parentNode) measurer.remove();
       }
