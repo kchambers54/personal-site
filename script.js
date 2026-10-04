@@ -233,6 +233,17 @@
       });
     }
 
+    function cycleDistance(entry) {
+      const set = entry.track.querySelector("[data-cover-set='original']");
+      const clone = entry.track.querySelector("[data-cover-set='clone']");
+      if (!set) return 0;
+      // Layout distance to the single cloned cycle, not the clipped on-screen box.
+      if (clone && clone.offsetLeft > set.offsetLeft) {
+        return clone.offsetLeft - set.offsetLeft;
+      }
+      return set.offsetWidth;
+    }
+
     function applyMeasuredWidth(key, width) {
       if (!key || !(width > 0)) return;
       knownWidths.set(key, width);
@@ -255,9 +266,7 @@
           link.style.height = COVER_HEIGHT + "px";
           if (before.right <= rowRect.left + 0.5) shift += width - before.width;
         });
-        const set = entry.track.querySelector("[data-cover-set='original']");
-        if (!set) return;
-        const newW = set.getBoundingClientRect().width;
+        const newW = cycleDistance(entry);
         if (!(newW > 0)) return;
         state.rowWidths[i] = newW;
         if (!state.ready) return;
@@ -477,7 +486,7 @@
         });
 
         state.phases = [0, built[0].stride, built[0].half];
-        state.rowWidths = built.map((item) => item.setWidth);
+        state.rowWidths = rowEntries.map((entry) => cycleDistance(entry));
         state.reduced = motionReduced();
         state.stripWidths = rowEntries.map((entry) => entry.row.clientWidth || viewport);
         if (carried && !state.reduced) {
