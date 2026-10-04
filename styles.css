@@ -20,20 +20,6 @@
     --accent: #b4532a;
   }
 
-  .hero__light--1,
-  .hero__light--4 {
-    background: #b4532a;
-  }
-
-  .hero__light--2,
-  .hero__light--5 {
-    background: #d9c49a;
-  }
-
-  .hero__light--3,
-  .hero__light--6 {
-    background: #2c4a7c;
-  }
 }
 
 *,
@@ -220,6 +206,24 @@ img {
   filter: blur(22px);
   animation-name: light-sine-6;
   animation-delay: -6.67s;
+}
+
+/* After the base light rules so these win in light mode. Color only. */
+@media (prefers-color-scheme: light) {
+  .hero__light--1,
+  .hero__light--4 {
+    background: #b4532a;
+  }
+
+  .hero__light--2,
+  .hero__light--5 {
+    background: #d9c49a;
+  }
+
+  .hero__light--3,
+  .hero__light--6 {
+    background: #2c4a7c;
+  }
 }
 
 /* Angles ~0°, 60°, 120°, 180°, 240°, 300°; distinct inner/outer radii. */
