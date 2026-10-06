@@ -125,6 +125,33 @@
           "height": 1366
         }
       ]
+    },
+    {
+      "slug": "north-cascades",
+      "place": "North Cascades",
+      "date": "2023",
+      "images": [
+        {
+          "file": "DSC_6701.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6703.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6716.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6739.jpg",
+          "width": 3000,
+          "height": 2000
+        }
+      ]
     }
   ]
 }
