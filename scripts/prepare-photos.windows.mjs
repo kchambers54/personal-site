@@ -1,9 +1,10 @@
 // Windows copy of prepare-photos.mjs.
-// Records each image's width/height, then makes smaller copies in <slug>/w<width>/
-// using Windows PowerShell and System.Drawing (no sips).
+// Adds any full-size JPEGs under photos/<slug>/ to collections.json, records
+// width/height, then makes smaller copies in <slug>/w<width>/ using Windows
+// PowerShell and System.Drawing (no sips).
 // Run after adding photos: node scripts/prepare-photos.windows.mjs
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +57,55 @@ function jpegSize(path) {
   throw new Error("No JPEG size found in " + path);
 }
 
+const IMAGE_EXT = /\.(jpe?g)$/i;
+
+function imageFile(entry) {
+  return typeof entry === "string" ? entry : entry && entry.file;
+}
+
+function placeFromSlug(slug) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function listFullSizeImages(slug) {
+  return readdirSync(join(photosDir, slug), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && IMAGE_EXT.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function syncManifestImages(manifest) {
+  const trips = Array.isArray(manifest.trips) ? manifest.trips : [];
+  const bySlug = new Map(trips.filter((trip) => trip && trip.slug).map((trip) => [trip.slug, trip]));
+  let added = 0;
+
+  const slugs = readdirSync(photosDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !/^w\d+$/.test(entry.name))
+    .map((entry) => entry.name);
+
+  for (const slug of slugs) {
+    const files = listFullSizeImages(slug);
+    let trip = bySlug.get(slug);
+    if (!trip) {
+      trip = { slug, place: placeFromSlug(slug), images: [] };
+      trips.push(trip);
+      bySlug.set(slug, trip);
+    }
+    const listed = new Set((trip.images || []).map(imageFile).filter(Boolean));
+    const extras = files.filter((file) => !listed.has(file));
+    if (!extras.length) continue;
+    trip.images = [...(trip.images || []), ...extras.map((file) => ({ file }))];
+    added += extras.length;
+  }
+
+  manifest.trips = trips;
+  return added;
+}
+
 function makeVariant(source, width, dest) {
   mkdirSync(dirname(dest), { recursive: true });
   execFileSync("powershell.exe", [
@@ -76,6 +126,7 @@ function makeVariant(source, width, dest) {
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const added = syncManifestImages(manifest);
 let sized = 0;
 let made = 0;
 
@@ -104,4 +155,4 @@ for (const trip of manifest.trips || []) {
 }
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
-console.log(`Recorded ${sized} size(s), made ${made} smaller cop${made === 1 ? "y" : "ies"}.`);
+console.log(`Added ${added} file${added === 1 ? "" : "s"}, recorded ${sized} size(s), made ${made} smaller cop${made === 1 ? "y" : "ies"}.`);
