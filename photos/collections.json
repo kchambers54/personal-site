@@ -1,8 +1,8 @@
 {
   "trips": [
     {
-      "slug": "gasworks-park",
-      "place": "Gasworks Park",
+      "slug": "seattle",
+      "place": "Seattle",
       "date": "2025",
       "images": [
         {
@@ -14,13 +14,17 @@
           "file": "02.jpg",
           "width": 4818,
           "height": 2000
+        },
+        {
+          "file": "DSC_0576.jpg",
+          "width": 3006,
+          "height": 2000
         }
       ]
     },
     {
-      "slug": "mt-rainier-winter",
-      "place": "Mt Rainier Winter",
-      "date": "2024",
+      "slug": "mt-rainier",
+      "place": "Mt Rainier",
       "images": [
         {
           "file": "01.jpg",
@@ -29,6 +33,21 @@
         },
         {
           "file": "02.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6803.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6809.jpg",
+          "width": 3000,
+          "height": 2000
+        },
+        {
+          "file": "DSC_6832.jpg",
           "width": 3000,
           "height": 2000
         }
@@ -127,9 +146,8 @@
       ]
     },
     {
-      "slug": "north-cascades",
-      "place": "North Cascades",
-      "date": "2023",
+      "slug": "wa-cascades",
+      "place": "Washington Cascades",
       "images": [
         {
           "file": "DSC_6701.jpg",
@@ -150,6 +168,31 @@
           "file": "DSC_6739.jpg",
           "width": 3000,
           "height": 2000
+        },
+        {
+          "file": "DSC_7128.jpg",
+          "width": 3201,
+          "height": 2000
+        },
+        {
+          "file": "DSC_7162.jpg",
+          "width": 3200,
+          "height": 2000
+        },
+        {
+          "file": "DSC_7178.jpg",
+          "width": 3199,
+          "height": 2000
+        },
+        {
+          "file": "DSC_7619-2.jpg",
+          "width": 2000,
+          "height": 2702
+        },
+        {
+          "file": "DSC_7652.jpg",
+          "width": 5145,
+          "height": 3338
         }
       ]
     }
