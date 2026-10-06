@@ -125,6 +125,24 @@
           "height": 1366
         }
       ]
+    },
+    {
+      "slug": "north-cascades",
+      "place": "North Cascades",
+      "images": [
+        {
+          "file": "DSC_6701.jpg"
+        },
+        {
+          "file": "DSC_6703.jpg"
+        },
+        {
+          "file": "DSC_6716.jpg"
+        },
+        {
+          "file": "DSC_6739.jpg"
+        }
+      ]
     }
   ]
 }
