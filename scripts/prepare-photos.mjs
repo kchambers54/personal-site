@@ -1,11 +1,12 @@
 // Prepares the photos in photos/<slug>/ for the site. Works on macOS, Windows and Linux (CI).
 //   1. Adds any full-size JPEGs found in photos/<slug>/ to photos/collections.json
 //      (a new folder becomes a new trip, with `place` made from the folder name).
-//   2. For new photos (no width/height in the manifest yet) wider than MAX_ORIGINAL_WIDTH,
-//      shrinks the original in place, applying its EXIF rotation.
+//   2. Shrinks any original wider than MAX_ORIGINAL_WIDTH in place, applying its EXIF
+//      rotation. Its smaller copies are remade first, from the full-size file.
 //   3. Records each photo's width and height.
 //   4. Makes smaller copies in photos/<slug>/w<width>/ for the site to pick from by screen size.
-// Safe to run again: photos already recorded and copies that already exist are left alone.
+// Safe to run again: originals at or under MAX_ORIGINAL_WIDTH that are already recorded,
+// and copies that already exist, are left alone.
 // Run: npm install && node scripts/prepare-photos.mjs   (GitHub Actions runs it on push too.)
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -83,10 +84,8 @@ async function displaySize(path) {
   return turned ? { width: meta.height, height: meta.width } : { width: meta.width, height: meta.height };
 }
 
-// Shrinks a new original to MAX_ORIGINAL_WIDTH in place. Returns true if it was rewritten.
+// Shrinks an original to MAX_ORIGINAL_WIDTH in place.
 async function shrinkOriginal(path) {
-  const { width } = await displaySize(path);
-  if (width <= MAX_ORIGINAL_WIDTH) return false;
   const tmp = path + ".tmp";
   try {
     await sharp(path)
@@ -98,17 +97,24 @@ async function shrinkOriginal(path) {
   } finally {
     rmSync(tmp, { force: true });
   }
-  return true;
 }
 
 async function makeVariant(source, width, dest) {
   mkdirSync(dirname(dest), { recursive: true });
-  await sharp(source)
-    .rotate()
-    .resize({ width })
-    .jpeg({ quality: VARIANT_QUALITY })
-    .toFile(dest);
+  const tmp = dest + ".tmp";
+  try {
+    await sharp(source)
+      .rotate()
+      .resize({ width })
+      .jpeg({ quality: VARIANT_QUALITY })
+      .toFile(tmp);
+    renameSync(tmp, dest);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
 }
+
+const variantPath = (slug, width, file) => join(photosDir, slug, "w" + width, file);
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const added = syncManifestImages(manifest);
@@ -123,14 +129,25 @@ for (const trip of manifest.trips || []) {
     let image = typeof entry === "string" ? { file: entry } : entry;
     const source = join(photosDir, trip.slug, image.file);
     try {
-      if (!image.width || !image.height) {
-        if (await shrinkOriginal(source)) shrunk += 1;
+      const size = await displaySize(source);
+      if (size.width > MAX_ORIGINAL_WIDTH) {
+        // Remake every copy from the full-size file, then shrink the original.
+        for (const width of VARIANT_WIDTHS) {
+          if (width >= MAX_ORIGINAL_WIDTH) continue;
+          await makeVariant(source, width, variantPath(trip.slug, width, image.file));
+          made += 1;
+        }
+        await shrinkOriginal(source);
         image = { ...image, ...(await displaySize(source)) };
+        shrunk += 1;
+        sized += 1;
+      } else if (!image.width || !image.height) {
+        image = { ...image, ...size };
         sized += 1;
       }
       for (const width of VARIANT_WIDTHS) {
         if (width >= image.width) continue;
-        const dest = join(photosDir, trip.slug, "w" + width, image.file);
+        const dest = variantPath(trip.slug, width, image.file);
         if (existsSync(dest)) continue;
         await makeVariant(source, width, dest);
         made += 1;
