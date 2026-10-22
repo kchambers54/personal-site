@@ -16,7 +16,7 @@ That's it. The **Prepare photos** GitHub Action (`.github/workflows/prepare-phot
 
 1. adds any new JPGs to `collections.json` (a new folder becomes a new trip, named from the folder,
    so `north-cascades` shows as "North Cascades")
-2. shrinks new photos wider than 2400px to 2400px wide (and applies their camera rotation)
+2. shrinks any photo wider than 2400px to 2400px wide (applying its camera rotation), remaking its copies
 3. records each photo's width and height
 4. makes the smaller copies in `<trip>/w480/`, `w960/` and `w1600/` that pages pick between by screen size
 
@@ -24,7 +24,7 @@ It commits the result to `main` as `github-actions[bot]` and asks GitHub Pages t
 site updates a minute or two later. Pull before your next local change. You can also run it by hand
 from the **Actions** tab (**Prepare photos > Run workflow**).
 
-Photos already in `collections.json` with a width and height are never rewritten, and existing copies
+Photos 2400px wide or less that are already in `collections.json` are never rewritten, and existing copies
 are kept, so running it again changes nothing.
 
 ## Editing a trip
