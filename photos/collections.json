@@ -7,18 +7,18 @@
       "images": [
         {
           "file": "01.jpg",
-          "width": 5721,
-          "height": 2000
+          "width": 2400,
+          "height": 839
         },
         {
           "file": "02.jpg",
-          "width": 4818,
-          "height": 2000
+          "width": 2400,
+          "height": 996
         },
         {
           "file": "DSC_0576.jpg",
-          "width": 3006,
-          "height": 2000
+          "width": 2400,
+          "height": 1597
         }
       ]
     },
@@ -28,28 +28,28 @@
       "images": [
         {
           "file": "01.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "02.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6803.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6809.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6832.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         }
       ]
     },
@@ -151,38 +151,38 @@
       "images": [
         {
           "file": "DSC_6701.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6703.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6716.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_6739.jpg",
-          "width": 3000,
-          "height": 2000
+          "width": 2400,
+          "height": 1600
         },
         {
           "file": "DSC_7128.jpg",
-          "width": 3201,
-          "height": 2000
+          "width": 2400,
+          "height": 1500
         },
         {
           "file": "DSC_7162.jpg",
-          "width": 3200,
-          "height": 2000
+          "width": 2400,
+          "height": 1500
         },
         {
           "file": "DSC_7178.jpg",
-          "width": 3199,
-          "height": 2000
+          "width": 2400,
+          "height": 1500
         },
         {
           "file": "DSC_7619-2.jpg",
@@ -191,8 +191,8 @@
         },
         {
           "file": "DSC_7652.jpg",
-          "width": 5145,
-          "height": 3338
+          "width": 2400,
+          "height": 1557
         }
       ]
     }

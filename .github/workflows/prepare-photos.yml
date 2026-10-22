@@ -1,0 +1,76 @@
+# Prepares new photos after they land on main: adds them to photos/collections.json,
+# shrinks big new originals, records sizes and makes the w480/w960/w1600 copies.
+# See photos/README.md.
+name: Prepare photos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "photos/**"
+      - "!photos/*/w[0-9]*/**"
+      - "!photos/collections.json"
+      - "!photos/README.md"
+      - "scripts/prepare-photos.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/prepare-photos.yml"
+  workflow_dispatch:
+
+# One run at a time; a newer push waits for the current run instead of racing it.
+concurrency:
+  group: prepare-photos
+  cancel-in-progress: false
+
+permissions:
+  contents: write # commit the prepared photos back to main
+  pages: write # ask GitHub Pages to rebuild after that commit
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prepare photos
+        run: node scripts/prepare-photos.mjs
+
+      - name: Commit and push changes
+        id: commit
+        run: |
+          git add -A photos
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Prepare photos (sizes, smaller copies)" -m "Automated by the Prepare photos workflow, run ${{ github.run_id }}."
+          # main may have moved while this ran; replay on top and retry a few times.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git pull --rebase origin main
+          done
+          echo "Could not push after 3 attempts." >&2
+          exit 1
+
+      # Pushes made with GITHUB_TOKEN don't start a Pages build on their own
+      # (Pages here deploys from the main branch), so request one.
+      - name: Request a GitHub Pages build
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${{ github.repository }}/pages/builds"

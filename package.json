@@ -1,0 +1,11 @@
+{
+  "name": "personal-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-photos": "node scripts/prepare-photos.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.0"
+  }
+}
