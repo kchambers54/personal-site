@@ -195,6 +195,18 @@
           "height": 1557
         }
       ]
+    },
+    {
+      "slug": "larches",
+      "place": "Larches",
+      "date": "2026",
+      "images": [
+        {
+          "file": "PXL_20261009_002949360.jpg",
+          "width": 2400,
+          "height": 3188
+        }
+      ]
     }
   ]
 }
