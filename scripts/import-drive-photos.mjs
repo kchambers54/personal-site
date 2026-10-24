@@ -295,7 +295,7 @@ export async function importFromDrive({ drive, folderId, photosDir = defaultPhot
         const year = mostCommonYear(years);
         if (year) entry.date = String(year);
         entry.images = [];
-        manifest.trips.push(entry);
+        manifest.trips.unshift(entry); // newest trips go first on the collections page
         known.add(trip.slug);
         manifestChanged = true;
       }
