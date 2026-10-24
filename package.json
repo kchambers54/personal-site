@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare-photos": "node scripts/prepare-photos.mjs"
+    "prepare-photos": "node scripts/prepare-photos.mjs",
+    "import-drive-photos": "node scripts/import-drive-photos.mjs",
+    "test": "node --test scripts/import-drive-photos.test.mjs"
   },
   "devDependencies": {
+    "@googleapis/drive": "^27.0.0",
+    "exif-reader": "^2.0.3",
     "sharp": "^0.34.0"
   }
 }
