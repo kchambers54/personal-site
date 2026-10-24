@@ -1,0 +1,107 @@
+# Every morning, imports new photos from the "Site Photos" Google Drive folder, prepares them
+# like the Prepare photos workflow does, commits them to main and asks GitHub Pages to rebuild.
+# Then it moves the imported files into an `imported` folder inside their trip folder in Drive.
+# Needs repo secrets GDRIVE_SA_KEY and GDRIVE_FOLDER_ID. See photos/README.md.
+name: Import photos from Google Drive
+
+on:
+  schedule:
+    - cron: "0 16 * * *" # 16:00 UTC: 9:00 AM Pacific in summer, 8:00 AM in winter
+  workflow_dispatch:
+
+# Same group as Prepare photos, so the two never write to main at the same time.
+concurrency:
+  group: prepare-photos
+  cancel-in-progress: false
+
+permissions:
+  contents: write # commit the imported photos to main
+  pages: write # ask GitHub Pages to rebuild after that commit
+
+jobs:
+  import:
+    # Pinned so the apt packages below exist (libheif plugins are separate packages on 24.04).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # sharp's prebuilt binaries can't read HEIC, so iPhone photos are converted with libheif.
+      - name: Install HEIC converter
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libheif-examples libheif-plugin-libde265
+
+      - name: Download new photos from Drive
+        id: import
+        env:
+          GDRIVE_SA_KEY: ${{ secrets.GDRIVE_SA_KEY }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: node scripts/import-drive-photos.mjs
+
+      - name: Prepare photos
+        if: steps.import.outputs.imported != '0'
+        run: node scripts/prepare-photos.mjs
+
+      - name: Commit and push changes
+        id: commit
+        if: steps.import.outputs.imported != '0'
+        run: |
+          git add -A photos
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Import ${{ steps.import.outputs.imported }} photo(s) from Google Drive" -m "Automated by the Import photos from Google Drive workflow, run ${{ github.run_id }}."
+          # main may have moved while this ran; replay on top and retry a few times.
+          for _ in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git pull --rebase origin main
+          done
+          echo "Could not push after 3 attempts." >&2
+          exit 1
+
+      # Pushes made with GITHUB_TOKEN don't start a Pages build (or the Prepare photos
+      # workflow), which is why this workflow does every step itself. Request the build.
+      - name: Request a GitHub Pages build
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${{ github.repository }}/pages/builds"
+
+      # Only once the photos are on main. Also retries moves left over from an earlier run
+      # (photos/.drive-imported.json remembers what was imported, so nothing is downloaded twice).
+      - name: Move imported files to the imported folders in Drive
+        if: steps.import.outputs.pending != '0' && (steps.commit.outputs.pushed == 'true' || steps.import.outputs.imported == '0')
+        env:
+          GDRIVE_SA_KEY: ${{ secrets.GDRIVE_SA_KEY }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: node scripts/import-drive-photos.mjs --finish
+
+  # GitHub turns off scheduled workflows in a public repo after 60 days with no activity.
+  # Re-enabling this workflow through the API on each scheduled run resets that clock,
+  # without adding commits. Runs as its own job so only it gets `actions: write`.
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Keep the daily schedule switched on
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PUT "repos/${{ github.repository }}/actions/workflows/import-drive-photos.yml/enable"
