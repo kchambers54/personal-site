@@ -13,59 +13,6 @@
       ]
     },
     {
-      "slug": "seattle",
-      "place": "Seattle",
-      "date": "2025",
-      "images": [
-        {
-          "file": "01.jpg",
-          "width": 2400,
-          "height": 839
-        },
-        {
-          "file": "02.jpg",
-          "width": 2400,
-          "height": 996
-        },
-        {
-          "file": "DSC_0576.jpg",
-          "width": 2400,
-          "height": 1597
-        }
-      ]
-    },
-    {
-      "slug": "mt-rainier",
-      "place": "Mt Rainier",
-      "images": [
-        {
-          "file": "01.jpg",
-          "width": 2400,
-          "height": 1600
-        },
-        {
-          "file": "02.jpg",
-          "width": 2400,
-          "height": 1600
-        },
-        {
-          "file": "DSC_6803.jpg",
-          "width": 2400,
-          "height": 1600
-        },
-        {
-          "file": "DSC_6809.jpg",
-          "width": 2400,
-          "height": 1600
-        },
-        {
-          "file": "DSC_6832.jpg",
-          "width": 2400,
-          "height": 1600
-        }
-      ]
-    },
-    {
       "slug": "alaska-2026",
       "place": "Alaska",
       "date": "2026",
@@ -154,6 +101,59 @@
           "file": "17.jpg",
           "width": 2048,
           "height": 1366
+        }
+      ]
+    },
+    {
+      "slug": "seattle",
+      "place": "Seattle",
+      "date": "2025",
+      "images": [
+        {
+          "file": "01.jpg",
+          "width": 2400,
+          "height": 839
+        },
+        {
+          "file": "02.jpg",
+          "width": 2400,
+          "height": 996
+        },
+        {
+          "file": "DSC_0576.jpg",
+          "width": 2400,
+          "height": 1597
+        }
+      ]
+    },
+    {
+      "slug": "mt-rainier",
+      "place": "Mt Rainier",
+      "images": [
+        {
+          "file": "01.jpg",
+          "width": 2400,
+          "height": 1600
+        },
+        {
+          "file": "02.jpg",
+          "width": 2400,
+          "height": 1600
+        },
+        {
+          "file": "DSC_6803.jpg",
+          "width": 2400,
+          "height": 1600
+        },
+        {
+          "file": "DSC_6809.jpg",
+          "width": 2400,
+          "height": 1600
+        },
+        {
+          "file": "DSC_6832.jpg",
+          "width": 2400,
+          "height": 1600
         }
       ]
     },
