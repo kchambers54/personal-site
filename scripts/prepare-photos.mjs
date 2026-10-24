@@ -63,7 +63,7 @@ function syncManifestImages(manifest) {
     if (!trip) {
       if (!files.length) continue;
       trip = { slug, place: placeFromSlug(slug), images: [] };
-      trips.push(trip);
+      trips.unshift(trip); // newest trips go first on the collections page
       bySlug.set(slug, trip);
     }
     const listed = new Set((trip.images || []).map(imageFile).filter(Boolean));
