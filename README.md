@@ -14,3 +14,5 @@ https://kchambers54.github.io/personal-site/ from the `main` branch.
   (`npm install && node scripts/prepare-photos.mjs` to run it locally).
 - `scripts/import-drive-photos.mjs` pulls new photos from Google Drive for the daily import Action
   (needs the `GDRIVE_SA_KEY` and `GDRIVE_FOLDER_ID` repo secrets).
+
+AI coding agents: see [AGENTS.md](AGENTS.md) for how the Actions and photo pipeline work.
