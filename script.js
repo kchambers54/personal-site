@@ -155,7 +155,8 @@
     const link = document.createElement("a");
     link.className = "cover-row__link";
     link.draggable = false;
-    link.href = "collection.html?slug=" + encodeURIComponent(frame.slug);
+    // The hash names the photo so the trip page can scroll to it (see collection.js).
+    link.href = "collection.html?slug=" + encodeURIComponent(frame.slug) + "#" + Photos.photoId(frame.file);
     link.dataset.frame = frameKey(frame);
     link.dataset.morph = frameKey(frame);
     if (frame.place) link.dataset.label = frame.place;

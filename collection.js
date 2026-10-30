@@ -224,6 +224,7 @@
       button.type = "button";
       button.className = "trip-photo";
       button.dataset.morph = trip.slug + "/" + image.file;
+      button.id = Photos.photoId(image.file);
       button.style.setProperty("--ar", ar);
       const img = document.createElement("img");
       img.alt = images.length > 1 ? place + ", photo " + (i + 1) : place;
@@ -243,6 +244,48 @@
       return { slug: trip.slug, image: image, alt: img.alt, button: button };
     });
     root.appendChild(grid);
+    revealTarget();
+  }
+
+  // —— Scroll to the photo named in the URL hash (links from the home page) ——
+  // Images above the target can change size as they load (EXIF rotation), so keep
+  // re-centring on each load until things settle or the visitor scrolls themselves.
+  let targetDone = false;
+  let stopFollow = null;
+
+  function navType() {
+    const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+    return nav ? nav.type : "";
+  }
+
+  function revealTarget() {
+    if (stopFollow) stopFollow();
+    const hash = decodeURIComponent(window.location.hash.slice(1));
+    if (!hash || targetDone) return;
+    const el = document.getElementById(hash);
+    if (!el || !el.classList.contains("trip-photo")) return;
+    // Back/forward and reloads keep the browser's own restored scroll position.
+    const restoring = navType() === "back_forward";
+    const centre = () => el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+    if (!restoring) centre();
+    if (!el.classList.contains("is-target")) {
+      el.classList.add("is-target");
+      window.setTimeout(() => el.classList.remove("is-target"), reduceMotion ? 1600 : 2200);
+    }
+    if (restoring) { targetDone = true; return; }
+
+    const grid = el.parentNode;
+    const onLoad = (e) => { if (e.target.tagName === "IMG") centre(); };
+    const stop = () => {
+      grid.removeEventListener("load", onLoad, true);
+      ["wheel", "touchstart", "keydown", "pointerdown"].forEach((t) => window.removeEventListener(t, stop));
+      window.clearTimeout(timer);
+      stopFollow = null;
+    };
+    grid.addEventListener("load", onLoad, true);
+    ["wheel", "touchstart", "keydown", "pointerdown"].forEach((t) => window.addEventListener(t, stop, { passive: true }));
+    const timer = window.setTimeout(() => { stop(); targetDone = true; }, 4000);
+    stopFollow = stop;
   }
 
   const slug = new URLSearchParams(window.location.search).get("slug");
