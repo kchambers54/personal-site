@@ -1308,3 +1308,24 @@ img {
     animation: none;
   }
 }
+
+/* Photo linked from the home page (collection.html?slug=...#photo-...). */
+.trip-photo {
+  scroll-margin-top: 72px;
+  scroll-margin-bottom: 16px;
+}
+
+.trip-photo.is-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  animation: target-pulse 1100ms ease-out 2;
+}
+
+@keyframes target-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-photo.is-target { animation: none; }
+}

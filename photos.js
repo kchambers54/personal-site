@@ -88,6 +88,13 @@ window.Photos = (function () {
     if (img.complete && img.naturalWidth) done();
   }
 
+  // Element id for a photo on its trip page, e.g. "DSC_6701.jpg" -> "photo-DSC_6701".
+  // Filenames are unique within a trip, so the id is unique on that page.
+  function photoId(file) {
+    const stem = String(file).replace(/\.[^.]+$/, "");
+    return "photo-" + stem.replace(/[^A-Za-z0-9_-]/g, "-");
+  }
+
   function countLabel(n) {
     return n + (n === 1 ? " photo" : " photos");
   }
@@ -164,6 +171,7 @@ window.Photos = (function () {
     srcset: srcset,
     setSources: setSources,
     fadeIn: fadeIn,
-    countLabel: countLabel
+    countLabel: countLabel,
+    photoId: photoId
   };
 })();
